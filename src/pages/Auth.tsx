@@ -94,8 +94,8 @@ const Auth: React.FC = () => {
         toast.error(error.message || 'Failed to sign up');
       }
     } else {
-      toast.success('Account created successfully! Welcome to CricScore!');
-      navigate('/');
+      toast.success('Account created! Please complete your profile.');
+      navigate('/profile-setup');
     }
   };
 

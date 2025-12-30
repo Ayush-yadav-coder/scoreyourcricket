@@ -9,6 +9,12 @@ interface Profile {
   avatar_url: string | null;
   is_famous: boolean;
   bio: string | null;
+  location: string | null;
+  playing_role: string | null;
+  batting_style: string | null;
+  bowling_style: string | null;
+  gender: string | null;
+  profile_completed: boolean;
 }
 
 interface AuthContextType {
