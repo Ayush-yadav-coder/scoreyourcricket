@@ -22,8 +22,8 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (phone: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
-  signIn: (phone: string, password: string) => Promise<{ error: Error | null }>;
+  sendOTP: (phone: string) => Promise<{ error: Error | null }>;
+  verifyOTP: (phone: string, token: string, fullName?: string) => Promise<{ error: Error | null; isNewUser?: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -83,25 +83,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (phone: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+  const sendOTP = async (phone: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
       phone,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
     });
     return { error };
   };
 
-  const signIn = async (phone: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+  const verifyOTP = async (phone: string, token: string, fullName?: string) => {
+    // First check if user exists
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle();
+
+    const isNewUser = !existingProfile;
+
+    const { error } = await supabase.auth.verifyOtp({
       phone,
-      password,
+      token,
+      type: 'sms',
     });
-    return { error };
+
+    if (!error && isNewUser && fullName) {
+      // Update the profile with the full name for new users
+      const { data: { user: newUser } } = await supabase.auth.getUser();
+      if (newUser) {
+        await supabase
+          .from('profiles')
+          .update({ full_name: fullName })
+          .eq('id', newUser.id);
+      }
+    }
+
+    return { error, isNewUser };
   };
 
   const signOut = async () => {
@@ -115,8 +131,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       session,
       profile,
       loading,
-      signUp,
-      signIn,
+      sendOTP,
+      verifyOTP,
       signOut,
       refreshProfile,
     }}>

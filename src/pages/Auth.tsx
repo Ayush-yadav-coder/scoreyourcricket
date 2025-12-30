@@ -5,24 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Phone, Lock, User, Loader2 } from 'lucide-react';
+import { Phone, User, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+
+type AuthStep = 'phone' | 'otp';
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signIn, signUp } = useAuth();
+  const { user, sendOTP, verifyOTP } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<AuthStep>('phone');
   
-  // Sign In form
-  const [signInPhone, setSignInPhone] = useState('');
-  const [signInPassword, setSignInPassword] = useState('');
-  
-  // Sign Up form
-  const [signUpPhone, setSignUpPhone] = useState('');
-  const [signUpPassword, setSignUpPassword] = useState('');
-  const [signUpName, setSignUpName] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [otp, setOtp] = useState('');
+  const [isNewUser, setIsNewUser] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -35,67 +33,71 @@ const Auth: React.FC = () => {
     return phoneRegex.test(phone.replace(/\s/g, ''));
   };
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validatePhone(signInPhone)) {
+    if (!validatePhone(phone)) {
       toast.error('Please enter a valid phone number with country code (e.g., +919876543210)');
       return;
     }
 
-    if (signInPassword.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
-
     setLoading(true);
-    const { error } = await signIn(signInPhone, signInPassword);
+    const { error } = await sendOTP(phone);
     setLoading(false);
 
     if (error) {
-      toast.error(error.message || 'Failed to sign in');
+      toast.error(error.message || 'Failed to send OTP');
     } else {
-      toast.success('Welcome back!');
-      navigate('/');
+      toast.success('OTP sent to your phone!');
+      setStep('otp');
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!signUpName.trim()) {
-      toast.error('Please enter your full name');
+    if (otp.length !== 6) {
+      toast.error('Please enter the 6-digit OTP');
       return;
     }
 
-    if (!validatePhone(signUpPhone)) {
-      toast.error('Please enter a valid phone number with country code (e.g., +919876543210)');
-      return;
-    }
-
-    if (signUpPassword.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
-
-    if (signUpPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
+    if (isNewUser && !fullName.trim()) {
+      toast.error('Please enter your name');
       return;
     }
 
     setLoading(true);
-    const { error } = await signUp(signUpPhone, signUpPassword, signUpName);
+    const { error, isNewUser: newUser } = await verifyOTP(phone, otp, fullName.trim() || undefined);
     setLoading(false);
 
     if (error) {
-      if (error.message.includes('already registered')) {
-        toast.error('This phone number is already registered. Please sign in.');
-      } else {
-        toast.error(error.message || 'Failed to sign up');
-      }
+      toast.error(error.message || 'Invalid OTP');
     } else {
-      toast.success('Account created! Please complete your profile.');
-      navigate('/profile-setup');
+      if (newUser) {
+        toast.success('Welcome! Please complete your profile.');
+        navigate('/profile-setup');
+      } else {
+        toast.success('Welcome back!');
+        navigate('/');
+      }
+    }
+  };
+
+  const handleBack = () => {
+    setStep('phone');
+    setOtp('');
+  };
+
+  const handleResendOTP = async () => {
+    setLoading(true);
+    const { error } = await sendOTP(phone);
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message || 'Failed to resend OTP');
+    } else {
+      toast.success('OTP resent successfully!');
+      setOtp('');
     }
   };
 
@@ -113,142 +115,156 @@ const Auth: React.FC = () => {
 
         <Card className="border-2">
           <CardHeader className="text-center">
-            <CardTitle className="font-display text-xl">Welcome</CardTitle>
-            <CardDescription>Sign in or create an account to continue</CardDescription>
+            <CardTitle className="font-display text-xl">
+              {step === 'phone' ? 'Welcome' : 'Verify OTP'}
+            </CardTitle>
+            <CardDescription>
+              {step === 'phone' 
+                ? 'Enter your phone number to continue' 
+                : `Enter the 6-digit code sent to ${phone}`}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="signin">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-phone">Phone Number</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signin-phone"
-                        type="tel"
-                        placeholder="+919876543210"
-                        value={signInPhone}
-                        onChange={(e) => setSignInPhone(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
+            {step === 'phone' ? (
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+919876543210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Include country code (e.g., +91 for India)
+                  </p>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signin-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={signInPassword}
-                        onChange={(e) => setSignInPassword(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="newUser"
+                    checked={isNewUser}
+                    onChange={(e) => setIsNewUser(e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  <Label htmlFor="newUser" className="text-sm font-normal cursor-pointer">
+                    I'm a new user
+                  </Label>
+                </div>
 
-                  <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing In...
-                      </>
-                    ) : (
-                      'Sign In'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
+                {isNewUser && (
+                  <div className="space-y-2 animate-fade-in">
+                    <Label htmlFor="fullName">Full Name</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        id="signup-name"
+                        id="fullName"
                         type="text"
                         placeholder="Virat Kohli"
-                        value={signUpName}
-                        onChange={(e) => setSignUpName(e.target.value)}
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
                         className="pl-10"
-                        required
+                        required={isNewUser}
                       />
                     </div>
                   </div>
+                )}
 
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="mr-2 h-4 w-4" />
+                      Get OTP
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOTP} className="space-y-6">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBack}
+                  className="mb-2 -ml-2"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Change Number
+                </Button>
+
+                <div className="flex flex-col items-center gap-4">
+                  <Label>Enter OTP</Label>
+                  <InputOTP 
+                    maxLength={6} 
+                    value={otp} 
+                    onChange={(value) => setOtp(value)}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+
+                {isNewUser && (
                   <div className="space-y-2">
-                    <Label htmlFor="signup-phone">Phone Number</Label>
+                    <Label htmlFor="fullNameOtp">Your Name</Label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        id="signup-phone"
-                        type="tel"
-                        placeholder="+919876543210"
-                        value={signUpPhone}
-                        onChange={(e) => setSignUpPhone(e.target.value)}
+                        id="fullNameOtp"
+                        type="text"
+                        placeholder="Virat Kohli"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
                         className="pl-10"
                         required
                       />
                     </div>
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={signUpPassword}
-                        onChange={(e) => setSignUpPassword(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
+                <Button type="submit" className="w-full" size="lg" disabled={loading || otp.length !== 6}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify & Continue'
+                  )}
+                </Button>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="confirm-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating Account...
-                      </>
-                    ) : (
-                      'Create Account'
-                    )}
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={handleResendOTP}
+                    disabled={loading}
+                    className="text-muted-foreground"
+                  >
+                    Didn't receive OTP? Resend
                   </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+                </div>
+              </form>
+            )}
           </CardContent>
         </Card>
 
