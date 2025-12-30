@@ -10,6 +10,9 @@ import NewMatch from "./pages/NewMatch";
 import Scoring from "./pages/Scoring";
 import Profile from "./pages/Profile";
 import ProfileSetup from "./pages/ProfileSetup";
+import Search from "./pages/Search";
+import PlayerProfile from "./pages/PlayerProfile";
+import Career from "./pages/Career";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +29,9 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile-setup" element={<ProfileSetup />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/player/:playerId" element={<PlayerProfile />} />
+            <Route path="/career" element={<Career />} />
             <Route path="/new-match" element={<NewMatch />} />
             <Route path="/scoring/:matchId" element={<Scoring />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
