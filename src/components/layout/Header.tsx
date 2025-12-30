@@ -113,10 +113,10 @@ const Header: React.FC = () => {
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-48 bg-popover border border-border shadow-lg">
                 <DropdownMenuItem onClick={() => navigate('/profile')}>
                   <User className="mr-2 h-4 w-4" />
-                  Profile
+                  View Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/career')}>
                   <Trophy className="mr-2 h-4 w-4" />

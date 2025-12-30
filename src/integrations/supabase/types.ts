@@ -541,32 +541,50 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          batting_style: string | null
           bio: string | null
+          bowling_style: string | null
           created_at: string | null
           full_name: string
+          gender: string | null
           id: string
           is_famous: boolean | null
+          location: string | null
           phone: string
+          playing_role: string | null
+          profile_completed: boolean | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
+          batting_style?: string | null
           bio?: string | null
+          bowling_style?: string | null
           created_at?: string | null
           full_name: string
+          gender?: string | null
           id: string
           is_famous?: boolean | null
+          location?: string | null
           phone: string
+          playing_role?: string | null
+          profile_completed?: boolean | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
+          batting_style?: string | null
           bio?: string | null
+          bowling_style?: string | null
           created_at?: string | null
           full_name?: string
+          gender?: string | null
           id?: string
           is_famous?: boolean | null
+          location?: string | null
           phone?: string
+          playing_role?: string | null
+          profile_completed?: boolean | null
           updated_at?: string | null
         }
         Relationships: []
