@@ -6,18 +6,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Phone, User, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
+import { Mail, User, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
-type AuthStep = 'phone' | 'otp';
+type AuthStep = 'email' | 'otp';
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
   const { user, sendOTP, verifyOTP } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<AuthStep>('phone');
+  const [step, setStep] = useState<AuthStep>('email');
   
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [otp, setOtp] = useState('');
   const [isNewUser, setIsNewUser] = useState(false);
@@ -28,27 +28,27 @@ const Auth: React.FC = () => {
     }
   }, [user, navigate]);
 
-  const validatePhone = (phone: string) => {
-    const phoneRegex = /^\+?[1-9]\d{9,14}$/;
-    return phoneRegex.test(phone.replace(/\s/g, ''));
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validatePhone(phone)) {
-      toast.error('Please enter a valid phone number with country code (e.g., +919876543210)');
+    if (!validateEmail(email)) {
+      toast.error('Please enter a valid email address');
       return;
     }
 
     setLoading(true);
-    const { error } = await sendOTP(phone);
+    const { error } = await sendOTP(email);
     setLoading(false);
 
     if (error) {
       toast.error(error.message || 'Failed to send OTP');
     } else {
-      toast.success('OTP sent to your phone!');
+      toast.success('OTP sent to your email!');
       setStep('otp');
     }
   };
@@ -67,7 +67,7 @@ const Auth: React.FC = () => {
     }
 
     setLoading(true);
-    const { error, isNewUser: newUser } = await verifyOTP(phone, otp, fullName.trim() || undefined);
+    const { error, isNewUser: newUser } = await verifyOTP(email, otp, fullName.trim() || undefined);
     setLoading(false);
 
     if (error) {
@@ -84,13 +84,13 @@ const Auth: React.FC = () => {
   };
 
   const handleBack = () => {
-    setStep('phone');
+    setStep('email');
     setOtp('');
   };
 
   const handleResendOTP = async () => {
     setLoading(true);
-    const { error } = await sendOTP(phone);
+    const { error } = await sendOTP(email);
     setLoading(false);
 
     if (error) {
@@ -116,34 +116,31 @@ const Auth: React.FC = () => {
         <Card className="border-2">
           <CardHeader className="text-center">
             <CardTitle className="font-display text-xl">
-              {step === 'phone' ? 'Welcome' : 'Verify OTP'}
+              {step === 'email' ? 'Welcome' : 'Verify OTP'}
             </CardTitle>
             <CardDescription>
-              {step === 'phone' 
-                ? 'Enter your phone number to continue' 
-                : `Enter the 6-digit code sent to ${phone}`}
+              {step === 'email' 
+                ? 'Enter your email address to continue' 
+                : `Enter the 6-digit code sent to ${email}`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {step === 'phone' ? (
+            {step === 'email' ? (
               <form onSubmit={handleSendOTP} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="email">Email Address</Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+919876543210"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       className="pl-10"
                       required
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Include country code (e.g., +91 for India)
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -201,7 +198,7 @@ const Auth: React.FC = () => {
                   className="mb-2 -ml-2"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Change Number
+                  Change Email
                 </Button>
 
                 <div className="flex flex-col items-center gap-4">

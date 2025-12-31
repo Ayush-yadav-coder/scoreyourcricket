@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Search, User, LogOut, Trophy, Users, Calendar, Play, ChevronDown } from 'lucide-react';
+import { Menu, Search, User, LogOut, Trophy, Users, Calendar, Play, ChevronDown, Medal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -34,6 +34,7 @@ const Header: React.FC = () => {
   const menuItems = [
     { icon: User, label: 'View Profile', href: '/profile' },
     { icon: Trophy, label: 'Our Career', href: '/career' },
+    { icon: Medal, label: 'Leaderboard', href: '/leaderboard' },
     { icon: Calendar, label: 'Our Matches', href: '/matches' },
     { icon: Play, label: 'Start a Match', href: '/new-match' },
     { icon: Trophy, label: 'Start a Tournament', href: '/new-tournament' },
