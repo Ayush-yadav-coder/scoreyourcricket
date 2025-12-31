@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Menu, MoreVertical, Camera, Users, Clock, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import CricketField from '@/components/scoring/CricketField';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useRealtimeScoring } from '@/hooks/useRealtimeScoring';
 
 interface Player {
   id: string;
@@ -66,6 +67,57 @@ const Scoring: React.FC = () => {
   
   const [ballsInOver, setBallsInOver] = useState(0);
   const [currentOver, setCurrentOver] = useState(0);
+
+  const refetchInnings = useCallback(async () => {
+    if (!innings?.id) return;
+    const { data } = await supabase
+      .from('innings')
+      .select('*')
+      .eq('id', innings.id)
+      .single();
+    if (data) {
+      setInnings(data);
+      setCurrentOver(Math.floor(data.total_overs));
+      setBallsInOver(Math.round((data.total_overs % 1) * 10));
+    }
+  }, [innings?.id]);
+
+  const refetchBatsmen = useCallback(async () => {
+    if (!innings?.id) return;
+    const { data: batsmen } = await supabase
+      .from('batting_scores')
+      .select('*')
+      .eq('innings_id', innings.id)
+      .eq('is_out', false)
+      .limit(2);
+    if (batsmen && batsmen.length >= 2) {
+      const strikerData = batsmen.find(b => b.is_striker);
+      const nonStrikerData = batsmen.find(b => !b.is_striker);
+      setStriker(strikerData || null);
+      setNonStriker(nonStrikerData || null);
+    }
+  }, [innings?.id]);
+
+  const refetchBowler = useCallback(async () => {
+    if (!innings?.id) return;
+    const { data: bowler } = await supabase
+      .from('bowling_scores')
+      .select('*')
+      .eq('innings_id', innings.id)
+      .eq('is_current_bowler', true)
+      .maybeSingle();
+    if (bowler) setCurrentBowler(bowler);
+  }, [innings?.id]);
+
+  // Subscribe to realtime updates
+  useRealtimeScoring({
+    matchId,
+    inningsId: innings?.id,
+    onInningsUpdate: refetchInnings,
+    onBattingUpdate: refetchBatsmen,
+    onBowlingUpdate: refetchBowler,
+    onDeliveryInsert: refetchInnings,
+  });
 
   useEffect(() => {
     if (!user || !matchId) {

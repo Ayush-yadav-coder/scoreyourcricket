@@ -22,8 +22,8 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  sendOTP: (phone: string) => Promise<{ error: Error | null }>;
-  verifyOTP: (phone: string, token: string, fullName?: string) => Promise<{ error: Error | null; isNewUser?: boolean }>;
+  sendOTP: (email: string) => Promise<{ error: Error | null }>;
+  verifyOTP: (email: string, token: string, fullName?: string) => Promise<{ error: Error | null; isNewUser?: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -83,27 +83,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const sendOTP = async (phone: string) => {
+  const sendOTP = async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
-      phone,
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
     });
     return { error };
   };
 
-  const verifyOTP = async (phone: string, token: string, fullName?: string) => {
-    // First check if user exists
+  const verifyOTP = async (email: string, token: string, fullName?: string) => {
+    // First check if user exists by email
     const { data: existingProfile } = await supabase
       .from('profiles')
       .select('id')
-      .eq('phone', phone)
+      .ilike('phone', email) // We'll store email in phone field for now
       .maybeSingle();
 
     const isNewUser = !existingProfile;
 
     const { error } = await supabase.auth.verifyOtp({
-      phone,
+      email,
       token,
-      type: 'sms',
+      type: 'email',
     });
 
     if (!error && isNewUser && fullName) {
