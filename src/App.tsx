@@ -14,6 +14,7 @@ import Search from "./pages/Search";
 import PlayerProfile from "./pages/PlayerProfile";
 import Career from "./pages/Career";
 import Leaderboard from "./pages/Leaderboard";
+import LiveMatch from "./pages/LiveMatch";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/new-match" element={<NewMatch />} />
             <Route path="/scoring/:matchId" element={<Scoring />} />
+            <Route path="/match/:matchId" element={<LiveMatch />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
