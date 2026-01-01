@@ -243,7 +243,7 @@ const Index: React.FC = () => {
                   <Card className="hover:shadow-md transition-shadow">
                     <CardContent className="flex items-center justify-between p-4">
                       <div className="flex items-center gap-4">
-                        <div className="h-2 w-2 rounded-full bg-cricket-red animate-pulse" />
+                        <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
                         <div>
                           <p className="font-semibold">
                             {match.team1?.name} vs {match.team2?.name}
@@ -254,7 +254,7 @@ const Index: React.FC = () => {
                         </div>
                       </div>
                       <Button variant="outline" size="sm">
-                        Watch
+                        Watch Live
                       </Button>
                     </CardContent>
                   </Card>
