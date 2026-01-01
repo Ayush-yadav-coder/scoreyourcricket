@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
+import SquadManager from '@/components/scoring/SquadManager';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -44,6 +45,10 @@ const NewMatch: React.FC = () => {
   const [tossWinner, setTossWinner] = useState('');
   const [tossDecision, setTossDecision] = useState<'bat' | 'bowl'>('bat');
 
+  // Squad counts for validation
+  const [team1SquadCount, setTeam1SquadCount] = useState(0);
+  const [team2SquadCount, setTeam2SquadCount] = useState(0);
+
   useEffect(() => {
     if (!user) {
       navigate('/auth');
@@ -52,9 +57,26 @@ const NewMatch: React.FC = () => {
     fetchTeams();
   }, [user, navigate]);
 
+  useEffect(() => {
+    if (team1Id) {
+      fetchSquadCount(team1Id, setTeam1SquadCount);
+    }
+    if (team2Id) {
+      fetchSquadCount(team2Id, setTeam2SquadCount);
+    }
+  }, [team1Id, team2Id]);
+
   const fetchTeams = async () => {
     const { data } = await supabase.from('teams').select('id, name').order('name');
     if (data) setTeams(data);
+  };
+
+  const fetchSquadCount = async (teamId: string, setter: (count: number) => void) => {
+    const { count } = await supabase
+      .from('team_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('team_id', teamId);
+    setter(count || 0);
   };
 
   const createTeam = async () => {
@@ -223,7 +245,43 @@ const NewMatch: React.FC = () => {
     </div>
   );
 
-  const renderStep2 = () => (
+  const renderStep2 = () => {
+    const team1 = teams.find((t) => t.id === team1Id);
+    const team2 = teams.find((t) => t.id === team2Id);
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <h2 className="font-display text-xl font-bold">Select Squad</h2>
+        <p className="text-muted-foreground text-sm">
+          Add players to each team's squad. Search by name or phone number.
+        </p>
+
+        {team1 && (
+          <SquadManager
+            teamId={team1Id}
+            teamName={team1.name}
+            onSquadUpdated={() => fetchSquadCount(team1Id, setTeam1SquadCount)}
+          />
+        )}
+
+        {team2 && (
+          <SquadManager
+            teamId={team2Id}
+            teamName={team2.name}
+            onSquadUpdated={() => fetchSquadCount(team2Id, setTeam2SquadCount)}
+          />
+        )}
+
+        {(team1SquadCount < 2 || team2SquadCount < 2) && (
+          <p className="text-sm text-destructive text-center">
+            Each team needs at least 2 players to start a match
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  const renderStep3 = () => (
     <div className="space-y-6 animate-fade-in">
       <h2 className="font-display text-xl font-bold">Match Details</h2>
 
@@ -324,7 +382,7 @@ const NewMatch: React.FC = () => {
     </div>
   );
 
-  const renderStep3 = () => {
+  const renderStep4 = () => {
     const team1 = teams.find((t) => t.id === team1Id);
     const team2 = teams.find((t) => t.id === team2Id);
 
@@ -393,6 +451,10 @@ const NewMatch: React.FC = () => {
     );
   };
 
+  const canProceedToStep2 = team1Id && team2Id && team1Id !== team2Id;
+  const canProceedToStep3 = team1SquadCount >= 2 && team2SquadCount >= 2;
+  const canStartMatch = tossWinner !== '';
+
   return (
     <MainLayout>
       <div className="max-w-2xl mx-auto">
@@ -405,11 +467,11 @@ const NewMatch: React.FC = () => {
           <CardHeader>
             <CardTitle className="font-display text-2xl">Start New Match</CardTitle>
             <CardDescription>
-              Step {step} of 3:{' '}
-              {step === 1 ? 'Select Teams' : step === 2 ? 'Match Details' : 'Toss'}
+              Step {step} of 4:{' '}
+              {step === 1 ? 'Select Teams' : step === 2 ? 'Select Squad' : step === 3 ? 'Match Details' : 'Toss'}
             </CardDescription>
             <div className="flex gap-2 mt-4">
-              {[1, 2, 3].map((s) => (
+              {[1, 2, 3, 4].map((s) => (
                 <div
                   key={s}
                   className={`h-2 flex-1 rounded-full transition-colors ${
@@ -423,6 +485,7 @@ const NewMatch: React.FC = () => {
             {step === 1 && renderStep1()}
             {step === 2 && renderStep2()}
             {step === 3 && renderStep3()}
+            {step === 4 && renderStep4()}
 
             <div className="flex justify-between mt-8">
               {step > 1 && (
@@ -431,11 +494,14 @@ const NewMatch: React.FC = () => {
                   Previous
                 </Button>
               )}
-              {step < 3 ? (
+              {step < 4 ? (
                 <Button
                   onClick={() => setStep(step + 1)}
                   className="ml-auto"
-                  disabled={step === 1 && (!team1Id || !team2Id)}
+                  disabled={
+                    (step === 1 && !canProceedToStep2) ||
+                    (step === 2 && !canProceedToStep3)
+                  }
                 >
                   Next
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -444,7 +510,7 @@ const NewMatch: React.FC = () => {
                 <Button
                   onClick={createMatch}
                   className="ml-auto"
-                  disabled={!tossWinner || loading}
+                  disabled={!canStartMatch || loading}
                 >
                   {loading ? (
                     <>
