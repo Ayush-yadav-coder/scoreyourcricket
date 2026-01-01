@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Menu, MoreVertical, Camera, Users, Clock, X, Check } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Camera, Users, Clock, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 import CricketField from '@/components/scoring/CricketField';
+import PlayerSelectDialog from '@/components/scoring/PlayerSelectDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRealtimeScoring } from '@/hooks/useRealtimeScoring';
@@ -59,7 +57,8 @@ const Scoring: React.FC = () => {
   const [nonStriker, setNonStriker] = useState<BattingScore | null>(null);
   const [currentBowler, setCurrentBowler] = useState<BowlingScore | null>(null);
   
-  const [showSelectBatsmen, setShowSelectBatsmen] = useState(false);
+  const [showSelectStriker, setShowSelectStriker] = useState(false);
+  const [showSelectNonStriker, setShowSelectNonStriker] = useState(false);
   const [showSelectBowler, setShowSelectBowler] = useState(false);
   const [showShotField, setShowShotField] = useState(false);
   const [pendingRuns, setPendingRuns] = useState(0);
@@ -67,6 +66,10 @@ const Scoring: React.FC = () => {
   
   const [ballsInOver, setBallsInOver] = useState(0);
   const [currentOver, setCurrentOver] = useState(0);
+  const [savingScore, setSavingScore] = useState(false);
+  
+  // Track already batting players
+  const [battingPlayerIds, setBattingPlayerIds] = useState<string[]>([]);
 
   const refetchInnings = useCallback(async () => {
     if (!innings?.id) return;
@@ -165,8 +168,6 @@ const Scoring: React.FC = () => {
         
         // Fetch current bowler
         await fetchCurrentBowler(inningsData.id);
-      } else {
-        setShowSelectBatsmen(true);
       }
     }
   };
@@ -187,23 +188,36 @@ const Scoring: React.FC = () => {
   };
 
   const fetchCurrentBatsmen = async (inningsId: string) => {
-    const { data: batsmen } = await supabase
+    // Fetch all batting scores to know who has already batted
+    const { data: allBatsmen } = await supabase
       .from('batting_scores')
       .select('*')
-      .eq('innings_id', inningsId)
-      .eq('is_out', false)
-      .limit(2);
+      .eq('innings_id', inningsId);
     
-    if (batsmen && batsmen.length >= 2) {
-      const strikerData = batsmen.find(b => b.is_striker);
-      const nonStrikerData = batsmen.find(b => !b.is_striker);
-      setStriker(strikerData || null);
-      setNonStriker(nonStrikerData || null);
-    } else if (batsmen && batsmen.length === 1) {
-      setStriker(batsmen[0]);
-      setShowSelectBatsmen(true);
+    if (allBatsmen) {
+      setBattingPlayerIds(allBatsmen.map(b => b.batsman_id));
+      
+      const notOutBatsmen = allBatsmen.filter(b => !b.is_out);
+      
+      if (notOutBatsmen.length >= 2) {
+        const strikerData = notOutBatsmen.find(b => b.is_striker);
+        const nonStrikerData = notOutBatsmen.find(b => !b.is_striker);
+        setStriker(strikerData || null);
+        setNonStriker(nonStrikerData || null);
+      } else if (notOutBatsmen.length === 1) {
+        if (notOutBatsmen[0].is_striker) {
+          setStriker(notOutBatsmen[0]);
+          setShowSelectNonStriker(true);
+        } else {
+          setNonStriker(notOutBatsmen[0]);
+          setShowSelectStriker(true);
+        }
+      } else {
+        // No batsmen yet - need to select both
+        setShowSelectStriker(true);
+      }
     } else {
-      setShowSelectBatsmen(true);
+      setShowSelectStriker(true);
     }
   };
 
@@ -218,134 +232,346 @@ const Scoring: React.FC = () => {
     if (bowler) {
       setCurrentBowler(bowler);
     } else {
+      // Only show bowler selection if we have batsmen
+      if (striker && nonStriker) {
+        setShowSelectBowler(true);
+      }
+    }
+  };
+
+  const handleSelectStriker = async (playerId: string) => {
+    if (!innings) return;
+    
+    setSavingScore(true);
+    // Create new batting score entry
+    const { data, error } = await supabase
+      .from('batting_scores')
+      .insert({
+        innings_id: innings.id,
+        batsman_id: playerId,
+        is_striker: true,
+        batting_position: battingPlayerIds.length + 1,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      toast.error('Failed to add batsman');
+      setSavingScore(false);
+      return;
+    }
+    
+    setStriker(data);
+    setBattingPlayerIds([...battingPlayerIds, playerId]);
+    setShowSelectStriker(false);
+    setSavingScore(false);
+    
+    // If no non-striker, show that dialog
+    if (!nonStriker) {
+      setShowSelectNonStriker(true);
+    } else if (!currentBowler) {
       setShowSelectBowler(true);
     }
   };
 
+  const handleSelectNonStriker = async (playerId: string) => {
+    if (!innings) return;
+    
+    setSavingScore(true);
+    const { data, error } = await supabase
+      .from('batting_scores')
+      .insert({
+        innings_id: innings.id,
+        batsman_id: playerId,
+        is_striker: false,
+        batting_position: battingPlayerIds.length + 1,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      toast.error('Failed to add batsman');
+      setSavingScore(false);
+      return;
+    }
+    
+    setNonStriker(data);
+    setBattingPlayerIds([...battingPlayerIds, playerId]);
+    setShowSelectNonStriker(false);
+    setSavingScore(false);
+    
+    // If no bowler, show that dialog
+    if (!currentBowler) {
+      setShowSelectBowler(true);
+    }
+  };
+
+  const handleSelectBowler = async (playerId: string) => {
+    if (!innings) return;
+    
+    setSavingScore(true);
+    
+    // Set any existing bowler as not current
+    await supabase
+      .from('bowling_scores')
+      .update({ is_current_bowler: false })
+      .eq('innings_id', innings.id)
+      .eq('is_current_bowler', true);
+    
+    // Check if bowler already has an entry
+    const { data: existingBowler } = await supabase
+      .from('bowling_scores')
+      .select('*')
+      .eq('innings_id', innings.id)
+      .eq('bowler_id', playerId)
+      .maybeSingle();
+    
+    if (existingBowler) {
+      // Update existing entry
+      const { data, error } = await supabase
+        .from('bowling_scores')
+        .update({ is_current_bowler: true })
+        .eq('id', existingBowler.id)
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error('Failed to select bowler');
+        setSavingScore(false);
+        return;
+      }
+      setCurrentBowler(data);
+    } else {
+      // Create new bowling score entry
+      const { data, error } = await supabase
+        .from('bowling_scores')
+        .insert({
+          innings_id: innings.id,
+          bowler_id: playerId,
+          is_current_bowler: true,
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error('Failed to add bowler');
+        setSavingScore(false);
+        return;
+      }
+      setCurrentBowler(data);
+    }
+    
+    setShowSelectBowler(false);
+    setSavingScore(false);
+    toast.success('Ready to score!');
+  };
+
   const handleRunClick = (runs: number) => {
+    if (!striker || !nonStriker || !currentBowler) {
+      toast.error('Please select batsmen and bowler first');
+      return;
+    }
     setPendingRuns(runs);
     setShowShotField(true);
   };
 
-  const handleShotSelect = async (x: number, y: number, region: string) => {
+  const handleShotSelect = (x: number, y: number, region: string) => {
     setSelectedShot({ x, y });
   };
 
   const confirmShot = async () => {
-    if (!innings || !striker || !nonStriker || !currentBowler) return;
+    if (!innings || !striker || !nonStriker || !currentBowler) {
+      toast.error('Missing required data');
+      return;
+    }
 
-    const newBallNumber = ballsInOver + 1;
-    const newOver = newBallNumber >= 6 ? currentOver + 1 : currentOver;
-    const newBallsInOver = newBallNumber >= 6 ? 0 : newBallNumber;
+    setSavingScore(true);
 
-    // Add delivery
-    await supabase.from('deliveries').insert({
-      innings_id: innings.id,
-      over_number: currentOver,
-      ball_number: ballsInOver + 1,
-      bowler_id: currentBowler.bowler_id,
-      batsman_id: striker.batsman_id,
-      non_striker_id: nonStriker.batsman_id,
-      runs: pendingRuns,
-      is_boundary: pendingRuns === 4,
-      is_six: pendingRuns === 6,
-      shot_x: selectedShot?.x,
-      shot_y: selectedShot?.y,
-    });
+    try {
+      const newBallNumber = ballsInOver + 1;
+      const newOver = newBallNumber >= 6 ? currentOver + 1 : currentOver;
+      const newBallsInOver = newBallNumber >= 6 ? 0 : newBallNumber;
 
-    // Update batsman score
-    await supabase
-      .from('batting_scores')
-      .update({
-        runs: striker.runs + pendingRuns,
-        balls_faced: striker.balls_faced + 1,
-        fours: striker.fours + (pendingRuns === 4 ? 1 : 0),
-        sixes: striker.sixes + (pendingRuns === 6 ? 1 : 0),
-      })
-      .eq('id', striker.id);
+      // Add delivery
+      const { error: deliveryError } = await supabase.from('deliveries').insert({
+        innings_id: innings.id,
+        over_number: currentOver,
+        ball_number: ballsInOver + 1,
+        bowler_id: currentBowler.bowler_id,
+        batsman_id: striker.batsman_id,
+        non_striker_id: nonStriker.batsman_id,
+        runs: pendingRuns,
+        is_boundary: pendingRuns === 4,
+        is_six: pendingRuns === 6,
+        shot_x: selectedShot?.x,
+        shot_y: selectedShot?.y,
+      });
 
-    // Update bowler score
-    const newOvers = newBallNumber >= 6 
-      ? currentBowler.overs + 1 
-      : parseFloat((currentBowler.overs + 0.1).toFixed(1));
-    
-    await supabase
-      .from('bowling_scores')
-      .update({
-        overs: newOvers,
-        runs_conceded: currentBowler.runs_conceded + pendingRuns,
-      })
-      .eq('id', currentBowler.id);
+      if (deliveryError) {
+        console.error('Delivery error:', deliveryError);
+        toast.error('Failed to record delivery');
+        setSavingScore(false);
+        return;
+      }
 
-    // Update innings
-    const newInningsOvers = newBallNumber >= 6 
-      ? innings.total_overs + 1 
-      : parseFloat((innings.total_overs + 0.1).toFixed(1));
-    
-    await supabase
-      .from('innings')
-      .update({
+      // Update batsman score
+      const { error: batsmanError } = await supabase
+        .from('batting_scores')
+        .update({
+          runs: striker.runs + pendingRuns,
+          balls_faced: striker.balls_faced + 1,
+          fours: striker.fours + (pendingRuns === 4 ? 1 : 0),
+          sixes: striker.sixes + (pendingRuns === 6 ? 1 : 0),
+        })
+        .eq('id', striker.id);
+
+      if (batsmanError) {
+        console.error('Batsman update error:', batsmanError);
+        toast.error('Failed to update batsman score');
+        setSavingScore(false);
+        return;
+      }
+
+      // Update bowler score
+      const newOvers = newBallNumber >= 6 
+        ? currentBowler.overs + 1 
+        : parseFloat((currentBowler.overs + 0.1).toFixed(1));
+      
+      const { error: bowlerError } = await supabase
+        .from('bowling_scores')
+        .update({
+          overs: newOvers,
+          runs_conceded: currentBowler.runs_conceded + pendingRuns,
+        })
+        .eq('id', currentBowler.id);
+
+      if (bowlerError) {
+        console.error('Bowler update error:', bowlerError);
+        toast.error('Failed to update bowler score');
+        setSavingScore(false);
+        return;
+      }
+
+      // Update innings
+      const newInningsOvers = newBallNumber >= 6 
+        ? innings.total_overs + 1 
+        : parseFloat((innings.total_overs + 0.1).toFixed(1));
+      
+      const { error: inningsError } = await supabase
+        .from('innings')
+        .update({
+          total_runs: innings.total_runs + pendingRuns,
+          total_overs: newInningsOvers,
+        })
+        .eq('id', innings.id);
+
+      if (inningsError) {
+        console.error('Innings update error:', inningsError);
+        toast.error('Failed to update innings');
+        setSavingScore(false);
+        return;
+      }
+
+      // Swap strike if odd runs
+      if (pendingRuns % 2 === 1) {
+        await supabase.from('batting_scores').update({ is_striker: false }).eq('id', striker.id);
+        await supabase.from('batting_scores').update({ is_striker: true }).eq('id', nonStriker.id);
+        // Swap local state
+        const temp = striker;
+        setStriker({ ...nonStriker, is_striker: true });
+        setNonStriker({ ...temp, is_striker: false });
+      }
+
+      // End of over - swap strike and change bowler
+      if (newBallNumber >= 6) {
+        await supabase.from('batting_scores').update({ is_striker: true }).eq('id', nonStriker.id);
+        await supabase.from('batting_scores').update({ is_striker: false }).eq('id', striker.id);
+        setShowSelectBowler(true);
+      }
+
+      // Update local state
+      setInnings({
+        ...innings,
         total_runs: innings.total_runs + pendingRuns,
         total_overs: newInningsOvers,
-      })
-      .eq('id', innings.id);
+      });
+      
+      if (pendingRuns % 2 === 0) {
+        setStriker({
+          ...striker,
+          runs: striker.runs + pendingRuns,
+          balls_faced: striker.balls_faced + 1,
+          fours: striker.fours + (pendingRuns === 4 ? 1 : 0),
+          sixes: striker.sixes + (pendingRuns === 6 ? 1 : 0),
+        });
+      }
+      
+      setCurrentBowler({
+        ...currentBowler,
+        overs: newOvers,
+        runs_conceded: currentBowler.runs_conceded + pendingRuns,
+      });
 
-    // Swap strike if odd runs
-    if (pendingRuns % 2 === 1) {
-      await supabase.from('batting_scores').update({ is_striker: false }).eq('id', striker.id);
-      await supabase.from('batting_scores').update({ is_striker: true }).eq('id', nonStriker.id);
+      setShowShotField(false);
+      setSelectedShot(null);
+      setPendingRuns(0);
+      setBallsInOver(newBallsInOver);
+      setCurrentOver(newOver);
+      
+      toast.success(`${pendingRuns} run${pendingRuns !== 1 ? 's' : ''} scored!`);
+    } catch (error) {
+      console.error('Error in confirmShot:', error);
+      toast.error('Failed to record score');
+    } finally {
+      setSavingScore(false);
     }
-
-    // End of over - swap strike and change bowler
-    if (newBallNumber >= 6) {
-      await supabase.from('batting_scores').update({ is_striker: true }).eq('id', nonStriker.id);
-      await supabase.from('batting_scores').update({ is_striker: false }).eq('id', striker.id);
-      setShowSelectBowler(true);
-    }
-
-    setShowShotField(false);
-    setSelectedShot(null);
-    setPendingRuns(0);
-    setBallsInOver(newBallsInOver);
-    setCurrentOver(newOver);
-    
-    // Refresh data
-    await fetchMatchData();
-    toast.success(`${pendingRuns} runs scored!`);
   };
 
   const handleWicket = async () => {
-    // Simplified wicket handling - would need full dismissal dialog in production
-    if (!striker || !innings) return;
+    if (!striker || !innings || !currentBowler) {
+      toast.error('Missing required data');
+      return;
+    }
     
-    await supabase
-      .from('batting_scores')
-      .update({ is_out: true, dismissal_type: 'bowled' })
-      .eq('id', striker.id);
+    setSavingScore(true);
     
-    await supabase
-      .from('innings')
-      .update({ total_wickets: innings.total_wickets + 1 })
-      .eq('id', innings.id);
-    
-    if (currentBowler) {
+    try {
+      await supabase
+        .from('batting_scores')
+        .update({ is_out: true, dismissal_type: 'bowled', bowler_id: currentBowler.bowler_id })
+        .eq('id', striker.id);
+      
+      await supabase
+        .from('innings')
+        .update({ total_wickets: innings.total_wickets + 1 })
+        .eq('id', innings.id);
+      
       await supabase
         .from('bowling_scores')
         .update({ wickets: currentBowler.wickets + 1 })
         .eq('id', currentBowler.id);
+      
+      setInnings({ ...innings, total_wickets: innings.total_wickets + 1 });
+      setCurrentBowler({ ...currentBowler, wickets: currentBowler.wickets + 1 });
+      setStriker(null);
+      setShowSelectStriker(true);
+      toast.success('Wicket!');
+    } catch (error) {
+      console.error('Error recording wicket:', error);
+      toast.error('Failed to record wicket');
+    } finally {
+      setSavingScore(false);
     }
-    
-    setStriker(null);
-    setShowSelectBatsmen(true);
-    toast.success('Wicket!');
-    await fetchMatchData();
   };
 
-  const getPlayerName = (playerId: string, isStriker: boolean = false) => {
-    const allPlayers = [...battingTeamPlayers];
+  const getPlayerName = (playerId: string) => {
+    const allPlayers = [...battingTeamPlayers, ...bowlingTeamPlayers];
     const player = allPlayers.find(p => p.player_id === playerId);
     return player?.profiles?.full_name || 'Unknown';
   };
+
+  // Check if we need to show initial selection
+  const needsPlayerSelection = !striker || !nonStriker || !currentBowler;
 
   if (!match || !innings) {
     return (
@@ -356,7 +582,6 @@ const Scoring: React.FC = () => {
   }
 
   const battingTeam = innings.batting_team_id === match.team1?.id ? match.team1 : match.team2;
-  const bowlingTeam = innings.bowling_team_id === match.team1?.id ? match.team1 : match.team2;
 
   return (
     <div className="min-h-screen bg-background">
@@ -402,7 +627,7 @@ const Scoring: React.FC = () => {
           <CardContent className="py-6">
             <div className="text-center">
               <p className="text-sm opacity-80">{battingTeam?.name}</p>
-              <p className="score-display mt-2">
+              <p className="text-4xl font-bold mt-2">
                 {innings.total_runs}/{innings.total_wickets}
               </p>
               <p className="text-lg mt-1">
@@ -419,7 +644,7 @@ const Scoring: React.FC = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-2">
-              {striker && (
+              {striker ? (
                 <div className="flex justify-between items-center p-2 bg-secondary rounded-lg">
                   <div className="flex items-center gap-2">
                     <span className="text-sm">*</span>
@@ -427,12 +652,20 @@ const Scoring: React.FC = () => {
                   </div>
                   <span className="font-bold">{striker.runs} ({striker.balls_faced})</span>
                 </div>
+              ) : (
+                <Button variant="outline" className="w-full" onClick={() => setShowSelectStriker(true)}>
+                  Select Striker
+                </Button>
               )}
-              {nonStriker && (
+              {nonStriker ? (
                 <div className="flex justify-between items-center p-2 rounded-lg">
                   <span className="font-medium">{getPlayerName(nonStriker.batsman_id)}</span>
                   <span className="font-bold">{nonStriker.runs} ({nonStriker.balls_faced})</span>
                 </div>
+              ) : striker && (
+                <Button variant="outline" className="w-full" onClick={() => setShowSelectNonStriker(true)}>
+                  Select Non-Striker
+                </Button>
               )}
             </div>
           </CardContent>
@@ -444,13 +677,17 @@ const Scoring: React.FC = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">Bowling</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            {currentBowler && (
+            {currentBowler ? (
               <div className="flex justify-between items-center">
                 <span className="font-medium">{getPlayerName(currentBowler.bowler_id)}</span>
                 <span className="font-bold">
                   {currentBowler.wickets}-{currentBowler.runs_conceded} ({currentBowler.overs})
                 </span>
               </div>
+            ) : striker && nonStriker && (
+              <Button variant="outline" className="w-full" onClick={() => setShowSelectBowler(true)}>
+                Select Bowler
+              </Button>
             )}
           </CardContent>
         </Card>
@@ -460,34 +697,78 @@ const Scoring: React.FC = () => {
           {[0, 1, 2, 3].map((run) => (
             <Button
               key={run}
-              variant="run"
+              variant="outline"
               className="text-xl h-16"
               onClick={() => handleRunClick(run)}
+              disabled={needsPlayerSelection || savingScore}
             >
               {run}
             </Button>
           ))}
         </div>
         <div className="grid grid-cols-4 gap-3">
-          <Button variant="score" className="bg-cricket-blue text-primary-foreground" onClick={() => handleRunClick(4)}>
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700 text-white" 
+            onClick={() => handleRunClick(4)}
+            disabled={needsPlayerSelection || savingScore}
+          >
             4
           </Button>
-          <Button variant="score" className="bg-cricket-gold text-foreground" onClick={() => handleRunClick(6)}>
+          <Button 
+            className="bg-yellow-500 hover:bg-yellow-600 text-black" 
+            onClick={() => handleRunClick(6)}
+            disabled={needsPlayerSelection || savingScore}
+          >
             6
           </Button>
-          <Button variant="wicket" className="col-span-2" onClick={handleWicket}>
+          <Button 
+            className="col-span-2 bg-red-600 hover:bg-red-700 text-white" 
+            onClick={handleWicket}
+            disabled={needsPlayerSelection || savingScore}
+          >
             OUT
           </Button>
         </div>
 
         {/* Extra buttons */}
         <div className="grid grid-cols-4 gap-3">
-          <Button variant="outline" size="sm">Wide</Button>
-          <Button variant="outline" size="sm">No Ball</Button>
-          <Button variant="outline" size="sm">Bye</Button>
-          <Button variant="outline" size="sm">Leg Bye</Button>
+          <Button variant="outline" size="sm" disabled={needsPlayerSelection}>Wide</Button>
+          <Button variant="outline" size="sm" disabled={needsPlayerSelection}>No Ball</Button>
+          <Button variant="outline" size="sm" disabled={needsPlayerSelection}>Bye</Button>
+          <Button variant="outline" size="sm" disabled={needsPlayerSelection}>Leg Bye</Button>
         </div>
       </main>
+
+      {/* Player Selection Dialogs */}
+      <PlayerSelectDialog
+        open={showSelectStriker}
+        onOpenChange={setShowSelectStriker}
+        title="Select Striker"
+        players={battingTeamPlayers}
+        excludePlayerIds={battingPlayerIds}
+        onSelect={handleSelectStriker}
+        loading={savingScore}
+      />
+
+      <PlayerSelectDialog
+        open={showSelectNonStriker}
+        onOpenChange={setShowSelectNonStriker}
+        title="Select Non-Striker"
+        players={battingTeamPlayers}
+        excludePlayerIds={[...battingPlayerIds, striker?.batsman_id || '']}
+        onSelect={handleSelectNonStriker}
+        loading={savingScore}
+      />
+
+      <PlayerSelectDialog
+        open={showSelectBowler}
+        onOpenChange={setShowSelectBowler}
+        title="Select Bowler"
+        players={bowlingTeamPlayers}
+        excludePlayerIds={currentBowler ? [currentBowler.bowler_id] : []}
+        onSelect={handleSelectBowler}
+        loading={savingScore}
+      />
 
       {/* Shot Selection Dialog */}
       <Dialog open={showShotField} onOpenChange={setShowShotField}>
@@ -501,9 +782,19 @@ const Scoring: React.FC = () => {
               <X className="mr-2 h-4 w-4" />
               Cancel
             </Button>
-            <Button className="flex-1" onClick={confirmShot} disabled={!selectedShot}>
-              <Check className="mr-2 h-4 w-4" />
-              Confirm {pendingRuns} Runs
+            <Button 
+              className="flex-1" 
+              onClick={confirmShot} 
+              disabled={!selectedShot || savingScore}
+            >
+              {savingScore ? (
+                'Saving...'
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Confirm {pendingRuns} Runs
+                </>
+              )}
             </Button>
           </div>
         </DialogContent>
