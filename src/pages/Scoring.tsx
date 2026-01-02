@@ -8,6 +8,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { useAuth } from '@/contexts/AuthContext';
 import CricketField from '@/components/scoring/CricketField';
 import PlayerSelectDialog from '@/components/scoring/PlayerSelectDialog';
+import DismissalDialog from '@/components/scoring/DismissalDialog';
+import ExtrasDialog from '@/components/scoring/ExtrasDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRealtimeScoring } from '@/hooks/useRealtimeScoring';
@@ -63,6 +65,10 @@ const Scoring: React.FC = () => {
   const [showShotField, setShowShotField] = useState(false);
   const [pendingRuns, setPendingRuns] = useState(0);
   const [selectedShot, setSelectedShot] = useState<{ x: number; y: number } | null>(null);
+  
+  const [showDismissalDialog, setShowDismissalDialog] = useState(false);
+  const [showExtrasDialog, setShowExtrasDialog] = useState(false);
+  const [currentExtraType, setCurrentExtraType] = useState<'wide' | 'no_ball' | 'bye' | 'leg_bye'>('wide');
   
   const [ballsInOver, setBallsInOver] = useState(0);
   const [currentOver, setCurrentOver] = useState(0);
@@ -527,7 +533,7 @@ const Scoring: React.FC = () => {
     }
   };
 
-  const handleWicket = async () => {
+  const handleWicket = async (dismissalType: string, fielderId?: string) => {
     if (!striker || !innings || !currentBowler) {
       toast.error('Missing required data');
       return;
@@ -538,7 +544,12 @@ const Scoring: React.FC = () => {
     try {
       await supabase
         .from('batting_scores')
-        .update({ is_out: true, dismissal_type: 'bowled', bowler_id: currentBowler.bowler_id })
+        .update({ 
+          is_out: true, 
+          dismissal_type: dismissalType as any, 
+          bowler_id: currentBowler.bowler_id,
+          fielder_id: fielderId || null
+        })
         .eq('id', striker.id);
       
       await supabase
@@ -554,6 +565,7 @@ const Scoring: React.FC = () => {
       setInnings({ ...innings, total_wickets: innings.total_wickets + 1 });
       setCurrentBowler({ ...currentBowler, wickets: currentBowler.wickets + 1 });
       setStriker(null);
+      setShowDismissalDialog(false);
       setShowSelectStriker(true);
       toast.success('Wicket!');
     } catch (error) {
@@ -562,6 +574,76 @@ const Scoring: React.FC = () => {
     } finally {
       setSavingScore(false);
     }
+  };
+
+  const handleExtra = async (runs: number) => {
+    if (!innings || !currentBowler) {
+      toast.error('Missing required data');
+      return;
+    }
+
+    setSavingScore(true);
+    const isLegalDelivery = currentExtraType === 'bye' || currentExtraType === 'leg_bye';
+
+    try {
+      // Update innings
+      const newBallNumber = isLegalDelivery ? ballsInOver + 1 : ballsInOver;
+      const newOver = newBallNumber >= 6 ? currentOver + 1 : currentOver;
+      const newBallsInOver = newBallNumber >= 6 ? 0 : newBallNumber;
+
+      const newInningsOvers = isLegalDelivery
+        ? (newBallNumber >= 6 ? innings.total_overs + 1 : parseFloat((innings.total_overs + 0.1).toFixed(1)))
+        : innings.total_overs;
+
+      await supabase
+        .from('innings')
+        .update({
+          total_runs: innings.total_runs + runs,
+          extras: (innings.extras || 0) + runs,
+          total_overs: newInningsOvers,
+        })
+        .eq('id', innings.id);
+
+      // Update bowler
+      if (currentExtraType === 'wide' || currentExtraType === 'no_ball') {
+        await supabase
+          .from('bowling_scores')
+          .update({
+            runs_conceded: currentBowler.runs_conceded + runs,
+            wides: currentExtraType === 'wide' ? (currentBowler.wides || 0) + 1 : currentBowler.wides,
+            no_balls: currentExtraType === 'no_ball' ? (currentBowler.no_balls || 0) + 1 : currentBowler.no_balls,
+          })
+          .eq('id', currentBowler.id);
+      }
+
+      setInnings({
+        ...innings,
+        total_runs: innings.total_runs + runs,
+        extras: (innings.extras || 0) + runs,
+        total_overs: newInningsOvers,
+      });
+
+      if (isLegalDelivery) {
+        setBallsInOver(newBallsInOver);
+        setCurrentOver(newOver);
+        if (newBallNumber >= 6) {
+          setShowSelectBowler(true);
+        }
+      }
+
+      setShowExtrasDialog(false);
+      toast.success(`${runs} extra${runs !== 1 ? 's' : ''} added`);
+    } catch (error) {
+      console.error('Error recording extras:', error);
+      toast.error('Failed to record extras');
+    } finally {
+      setSavingScore(false);
+    }
+  };
+
+  const openExtrasDialog = (type: 'wide' | 'no_ball' | 'bye' | 'leg_bye') => {
+    setCurrentExtraType(type);
+    setShowExtrasDialog(true);
   };
 
   const getPlayerName = (playerId: string) => {
@@ -723,7 +805,7 @@ const Scoring: React.FC = () => {
           </Button>
           <Button 
             className="col-span-2 bg-red-600 hover:bg-red-700 text-white" 
-            onClick={handleWicket}
+            onClick={() => setShowDismissalDialog(true)}
             disabled={needsPlayerSelection || savingScore}
           >
             OUT
@@ -732,10 +814,10 @@ const Scoring: React.FC = () => {
 
         {/* Extra buttons */}
         <div className="grid grid-cols-4 gap-3">
-          <Button variant="outline" size="sm" disabled={needsPlayerSelection}>Wide</Button>
-          <Button variant="outline" size="sm" disabled={needsPlayerSelection}>No Ball</Button>
-          <Button variant="outline" size="sm" disabled={needsPlayerSelection}>Bye</Button>
-          <Button variant="outline" size="sm" disabled={needsPlayerSelection}>Leg Bye</Button>
+          <Button variant="outline" size="sm" disabled={needsPlayerSelection} onClick={() => openExtrasDialog('wide')}>Wide</Button>
+          <Button variant="outline" size="sm" disabled={needsPlayerSelection} onClick={() => openExtrasDialog('no_ball')}>No Ball</Button>
+          <Button variant="outline" size="sm" disabled={needsPlayerSelection} onClick={() => openExtrasDialog('bye')}>Bye</Button>
+          <Button variant="outline" size="sm" disabled={needsPlayerSelection} onClick={() => openExtrasDialog('leg_bye')}>Leg Bye</Button>
         </div>
       </main>
 
@@ -799,7 +881,30 @@ const Scoring: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dismissal Dialog */}
+      <DismissalDialog
+        open={showDismissalDialog}
+        onOpenChange={setShowDismissalDialog}
+        bowlerName={currentBowler ? getPlayerName(currentBowler.bowler_id) : ''}
+        fieldingPlayers={bowlingTeamPlayers}
+        onConfirm={handleWicket}
+        loading={savingScore}
+      />
+
+      {/* Extras Dialog */}
+      <ExtrasDialog
+        open={showExtrasDialog}
+        onOpenChange={setShowExtrasDialog}
+        extraType={currentExtraType}
+        onConfirm={handleExtra}
+        loading={savingScore}
+      />
     </div>
+  );
+};
+
+export default Scoring;
   );
 };
 
