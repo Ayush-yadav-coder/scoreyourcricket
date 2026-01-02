@@ -179,7 +179,7 @@ const Index: React.FC = () => {
         </form>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Link to="/new-match">
             <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
               <CardContent className="flex flex-col items-center justify-center p-6">
@@ -209,6 +209,17 @@ const Index: React.FC = () => {
                   <Trophy className="h-6 w-6 text-cricket-gold" />
                 </div>
                 <span className="font-semibold text-center">Tournament</span>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/view-tournaments">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+              <CardContent className="flex flex-col items-center justify-center p-6">
+                <div className="h-12 w-12 rounded-full bg-cricket-gold/10 flex items-center justify-center mb-3">
+                  <Trophy className="h-6 w-6 text-cricket-gold/80" />
+                </div>
+                <span className="font-semibold text-center">View Tournaments</span>
               </CardContent>
             </Card>
           </Link>

@@ -16,6 +16,10 @@ import Career from "./pages/Career";
 import Leaderboard from "./pages/Leaderboard";
 import LiveMatch from "./pages/LiveMatch";
 import NotFound from "./pages/NotFound";
+import NewTournament from "./pages/NewTournament";
+import Tournament from "./pages/Tournament";
+import ViewMatches from "./pages/ViewMatches";
+import ViewTournaments from "./pages/ViewTournaments";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +42,10 @@ const App = () => (
             <Route path="/new-match" element={<NewMatch />} />
             <Route path="/scoring/:matchId" element={<Scoring />} />
             <Route path="/match/:matchId" element={<LiveMatch />} />
+            <Route path="/new-tournament" element={<NewTournament />} />
+            <Route path="/tournament/:tournamentId" element={<Tournament />} />
+            <Route path="/view-matches" element={<ViewMatches />} />
+            <Route path="/view-tournaments" element={<ViewTournaments />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
