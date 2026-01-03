@@ -7,11 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Circle, Trophy, Target, Zap } from 'lucide-react';
+import { Circle, Trophy, Target, Zap, Info } from 'lucide-react';
+import WagonWheel from '@/components/match/WagonWheel';
+import FallOfWickets from '@/components/match/FallOfWickets';
+import MatchAwards from '@/components/match/MatchAwards';
 
 interface Delivery {
   id: string;
+  innings_id: string;
   over_number: number;
   ball_number: number;
   runs: number;
@@ -22,6 +27,32 @@ interface Delivery {
   is_no_ball: boolean;
   dismissal_type: string | null;
   created_at: string;
+  shot_x: number | null;
+  shot_y: number | null;
+  batsman_id: string;
+  bowler_id: string;
+}
+
+interface BattingScore {
+  id: string;
+  batsman_id: string;
+  runs: number;
+  balls_faced: number;
+  fours: number;
+  sixes: number;
+  is_out: boolean;
+  dismissal_type: string | null;
+  bowler_id: string | null;
+  batting_position: number;
+}
+
+interface BowlingScore {
+  id: string;
+  bowler_id: string;
+  overs: number;
+  runs_conceded: number;
+  wickets: number;
+  maidens: number;
 }
 
 interface Innings {
@@ -52,6 +83,47 @@ interface Team {
   logo_url: string | null;
 }
 
+interface Profile {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+}
+
+interface WicketData {
+  wicket_number: number;
+  batsman_name: string;
+  runs: number;
+  score_at_wicket: number;
+  overs_at_wicket: number;
+  dismissal_type: string;
+  bowler_name?: string;
+}
+
+interface ShotData {
+  x: number;
+  y: number;
+  runs: number;
+  is_boundary: boolean;
+  is_six: boolean;
+}
+
+interface PlayerPerformance {
+  player_id: string;
+  player_name: string;
+  avatar_url?: string | null;
+  performance_type: 'batting' | 'bowling' | 'fielding';
+  runs?: number;
+  balls_faced?: number;
+  fours?: number;
+  sixes?: number;
+  wickets?: number;
+  overs?: number;
+  runs_conceded?: number;
+  catches?: number;
+  strike_rate?: number;
+  economy?: number;
+}
+
 const LiveMatch = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
@@ -59,10 +131,16 @@ const LiveMatch = () => {
   const [match, setMatch] = useState<Match | null>(null);
   const [teams, setTeams] = useState<{ team1: Team | null; team2: Team | null }>({ team1: null, team2: null });
   const [currentInnings, setCurrentInnings] = useState<Innings | null>(null);
+  const [allInnings, setAllInnings] = useState<Innings[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [allDeliveries, setAllDeliveries] = useState<Delivery[]>([]);
+  const [battingScores, setBattingScores] = useState<BattingScore[]>([]);
+  const [bowlingScores, setBowlingScores] = useState<BowlingScore[]>([]);
+  const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map());
   const [loading, setLoading] = useState(true);
   const [previousScore, setPreviousScore] = useState<number>(0);
   const [previousWickets, setPreviousWickets] = useState<number>(0);
+  const [selectedBatsmanForWheel, setSelectedBatsmanForWheel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -89,14 +167,12 @@ const LiveMatch = () => {
             const newInnings = payload.new as Innings;
             setCurrentInnings(prev => {
               if (prev && newInnings.id === prev.id) {
-                // Check for wickets
                 if (newInnings.total_wickets > previousWickets) {
                   toast.error('WICKET! 🏏', {
                     description: `${teams.team1?.name || 'Batting team'} loses a wicket!`,
                     duration: 5000,
                   });
                 }
-                // Check for milestones
                 if (Math.floor(newInnings.total_runs / 50) > Math.floor(previousScore / 50)) {
                   const milestone = Math.floor(newInnings.total_runs / 50) * 50;
                   toast.success(`${milestone} RUNS! 🎉`, {
@@ -109,6 +185,8 @@ const LiveMatch = () => {
               }
               return newInnings;
             });
+            // Refresh all data when innings updates
+            fetchMatchData();
           }
         }
       )
@@ -122,8 +200,8 @@ const LiveMatch = () => {
         (payload) => {
           const newDelivery = payload.new as Delivery;
           setDeliveries(prev => [newDelivery, ...prev].slice(0, 30));
+          setAllDeliveries(prev => [newDelivery, ...prev]);
           
-          // Notify on boundaries
           if (newDelivery.is_six) {
             toast.success('SIX! 💥', {
               description: 'Maximum! Ball sails over the boundary!',
@@ -158,6 +236,7 @@ const LiveMatch = () => {
               description: 'The match has ended.',
               duration: 5000,
             });
+            fetchMatchData(); // Refresh to get final stats
           }
         }
       )
@@ -202,31 +281,76 @@ const LiveMatch = () => {
         });
       }
 
-      // Fetch current innings
+      // Fetch all innings
       const { data: inningsData } = await supabase
         .from('innings')
         .select('*')
         .eq('match_id', matchId)
-        .eq('is_completed', false)
-        .order('innings_number', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('innings_number', { ascending: true });
 
-      if (inningsData) {
-        setCurrentInnings(inningsData);
-        setPreviousScore(inningsData.total_runs);
-        setPreviousWickets(inningsData.total_wickets);
+      if (inningsData && inningsData.length > 0) {
+        setAllInnings(inningsData);
+        const current = inningsData.find(i => !i.is_completed) || inningsData[inningsData.length - 1];
+        setCurrentInnings(current);
+        setPreviousScore(current.total_runs);
+        setPreviousWickets(current.total_wickets);
 
-        // Fetch recent deliveries
+        // Fetch all deliveries for all innings
+        const inningsIds = inningsData.map(i => i.id);
         const { data: deliveriesData } = await supabase
           .from('deliveries')
           .select('*')
-          .eq('innings_id', inningsData.id)
-          .order('created_at', { ascending: false })
-          .limit(30);
+          .in('innings_id', inningsIds)
+          .order('created_at', { ascending: false });
 
         if (deliveriesData) {
-          setDeliveries(deliveriesData);
+          setAllDeliveries(deliveriesData);
+          setDeliveries(deliveriesData.slice(0, 30));
+        }
+
+        // Fetch batting scores
+        const { data: battingData } = await supabase
+          .from('batting_scores')
+          .select('*')
+          .in('innings_id', inningsIds);
+
+        if (battingData) {
+          setBattingScores(battingData);
+        }
+
+        // Fetch bowling scores
+        const { data: bowlingData } = await supabase
+          .from('bowling_scores')
+          .select('*')
+          .in('innings_id', inningsIds);
+
+        if (bowlingData) {
+          setBowlingScores(bowlingData);
+        }
+
+        // Fetch profiles for all players
+        const playerIds = new Set<string>();
+        deliveriesData?.forEach(d => {
+          playerIds.add(d.batsman_id);
+          playerIds.add(d.bowler_id);
+        });
+        battingData?.forEach(b => {
+          playerIds.add(b.batsman_id);
+          if (b.bowler_id) playerIds.add(b.bowler_id);
+        });
+        bowlingData?.forEach(b => playerIds.add(b.bowler_id));
+
+        if (playerIds.size > 0) {
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', Array.from(playerIds));
+
+          if (profilesData) {
+            const profileMap = new Map<string, Profile>();
+            profilesData.forEach(p => profileMap.set(p.id, p));
+            setProfiles(profileMap);
+          }
         }
       }
     } catch (error) {
@@ -238,24 +362,21 @@ const LiveMatch = () => {
   };
 
   const getDeliveryDescription = (delivery: Delivery): string => {
-    const parts: string[] = [];
     const overBall = `${delivery.over_number}.${delivery.ball_number}`;
     
     if (delivery.is_wicket) {
-      parts.push(`${overBall} - WICKET! ${delivery.dismissal_type || 'Out'}`);
+      return `${overBall} - WICKET! ${delivery.dismissal_type || 'Out'}`;
     } else if (delivery.is_six) {
-      parts.push(`${overBall} - SIX! 💥`);
+      return `${overBall} - SIX! 💥`;
     } else if (delivery.is_boundary) {
-      parts.push(`${overBall} - FOUR! 🏏`);
+      return `${overBall} - FOUR! 🏏`;
     } else if (delivery.is_wide) {
-      parts.push(`${overBall} - Wide, ${delivery.runs} run(s)`);
+      return `${overBall} - Wide, ${delivery.runs} run(s)`;
     } else if (delivery.is_no_ball) {
-      parts.push(`${overBall} - No ball, ${delivery.runs} run(s)`);
+      return `${overBall} - No ball, ${delivery.runs} run(s)`;
     } else {
-      parts.push(`${overBall} - ${delivery.runs} run(s)`);
+      return `${overBall} - ${delivery.runs} run(s)`;
     }
-    
-    return parts.join('');
   };
 
   const getBattingTeamName = () => {
@@ -263,9 +384,145 @@ const LiveMatch = () => {
     return currentInnings.batting_team_id === teams.team1.id ? teams.team1.name : teams.team2.name;
   };
 
-  const getBowlingTeamName = () => {
-    if (!currentInnings || !teams.team1 || !teams.team2) return 'Bowling Team';
-    return currentInnings.bowling_team_id === teams.team1.id ? teams.team1.name : teams.team2.name;
+  const getFallOfWickets = (): WicketData[] => {
+    if (!currentInnings) return [];
+    
+    const wicketDeliveries = allDeliveries
+      .filter(d => d.innings_id === currentInnings.id && d.is_wicket)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    let runningScore = 0;
+    const wickets: WicketData[] = [];
+
+    // Calculate running score for each wicket
+    const sortedDeliveries = allDeliveries
+      .filter(d => d.innings_id === currentInnings.id)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    sortedDeliveries.forEach(delivery => {
+      runningScore += delivery.runs || 0;
+      if (delivery.is_wicket) {
+        const batsman = profiles.get(delivery.batsman_id);
+        const bowler = profiles.get(delivery.bowler_id);
+        const battingScore = battingScores.find(b => b.batsman_id === delivery.batsman_id && b.is_out);
+        
+        wickets.push({
+          wicket_number: wickets.length + 1,
+          batsman_name: batsman?.full_name || 'Unknown',
+          runs: battingScore?.runs || 0,
+          score_at_wicket: runningScore,
+          overs_at_wicket: delivery.over_number + (delivery.ball_number / 10),
+          dismissal_type: delivery.dismissal_type || 'Out',
+          bowler_name: bowler?.full_name,
+        });
+      }
+    });
+
+    return wickets;
+  };
+
+  const getWagonWheelShots = (batsmanId?: string): ShotData[] => {
+    if (!currentInnings) return [];
+    
+    return allDeliveries
+      .filter(d => 
+        d.innings_id === currentInnings.id && 
+        d.shot_x !== null && 
+        d.shot_y !== null &&
+        d.runs > 0 &&
+        (!batsmanId || d.batsman_id === batsmanId)
+      )
+      .map(d => ({
+        x: d.shot_x!,
+        y: d.shot_y!,
+        runs: d.runs,
+        is_boundary: d.is_boundary,
+        is_six: d.is_six,
+      }));
+  };
+
+  const getPlayerPerformances = (): { playerOfMatch?: PlayerPerformance; bestBatsman?: PlayerPerformance; bestBowler?: PlayerPerformance; starPerformances: PlayerPerformance[] } => {
+    const performances: PlayerPerformance[] = [];
+    
+    // Get batting performances
+    battingScores.forEach(bs => {
+      const profile = profiles.get(bs.batsman_id);
+      if (profile && bs.runs >= 20) {
+        const strikeRate = bs.balls_faced > 0 ? (bs.runs / bs.balls_faced) * 100 : 0;
+        performances.push({
+          player_id: bs.batsman_id,
+          player_name: profile.full_name,
+          avatar_url: profile.avatar_url,
+          performance_type: 'batting',
+          runs: bs.runs,
+          balls_faced: bs.balls_faced,
+          fours: bs.fours,
+          sixes: bs.sixes,
+          strike_rate: strikeRate,
+        });
+      }
+    });
+
+    // Get bowling performances
+    bowlingScores.forEach(bs => {
+      const profile = profiles.get(bs.bowler_id);
+      if (profile && bs.wickets >= 1) {
+        const economy = bs.overs > 0 ? bs.runs_conceded / bs.overs : 0;
+        performances.push({
+          player_id: bs.bowler_id,
+          player_name: profile.full_name,
+          avatar_url: profile.avatar_url,
+          performance_type: 'bowling',
+          wickets: bs.wickets,
+          overs: bs.overs,
+          runs_conceded: bs.runs_conceded,
+          economy: economy,
+        });
+      }
+    });
+
+    // Sort and determine awards
+    const sortedBatting = performances
+      .filter(p => p.performance_type === 'batting')
+      .sort((a, b) => (b.runs || 0) - (a.runs || 0));
+    
+    const sortedBowling = performances
+      .filter(p => p.performance_type === 'bowling')
+      .sort((a, b) => (b.wickets || 0) - (a.wickets || 0));
+
+    const bestBatsman = sortedBatting[0];
+    const bestBowler = sortedBowling[0];
+
+    // Player of match - highest impact (runs or wickets * 25)
+    let playerOfMatch: PlayerPerformance | undefined;
+    const allSorted = [...performances].sort((a, b) => {
+      const scoreA = (a.runs || 0) + ((a.wickets || 0) * 25);
+      const scoreB = (b.runs || 0) + ((b.wickets || 0) * 25);
+      return scoreB - scoreA;
+    });
+    playerOfMatch = allSorted[0];
+
+    // Star performances - other notable performances not getting main awards
+    const starPerformances = allSorted.filter(p => 
+      p !== playerOfMatch && 
+      p !== bestBatsman && 
+      p !== bestBowler
+    ).slice(0, 4);
+
+    return { playerOfMatch, bestBatsman, bestBowler, starPerformances };
+  };
+
+  const getUniqueBatsmen = () => {
+    if (!currentInnings) return [];
+    const batsmenIds = new Set(
+      allDeliveries
+        .filter(d => d.innings_id === currentInnings.id && d.shot_x !== null)
+        .map(d => d.batsman_id)
+    );
+    return Array.from(batsmenIds).map(id => ({
+      id,
+      name: profiles.get(id)?.full_name || 'Unknown',
+    }));
   };
 
   if (loading) {
@@ -290,6 +547,11 @@ const LiveMatch = () => {
     );
   }
 
+  const fallOfWickets = getFallOfWickets();
+  const wagonWheelShots = getWagonWheelShots(selectedBatsmanForWheel || undefined);
+  const { playerOfMatch, bestBatsman, bestBowler, starPerformances } = getPlayerPerformances();
+  const uniqueBatsmen = getUniqueBatsmen();
+
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-8 space-y-6">
@@ -304,87 +566,189 @@ const LiveMatch = () => {
           </Badge>
         </div>
 
-        {/* Scoreboard */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Trophy className="w-5 h-5 text-primary" />
-              Live Score
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentInnings ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Batting</p>
-                    <p className="text-xl font-bold text-foreground">{getBattingTeamName()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-4xl font-bold text-primary">
-                      {currentInnings.total_runs}/{currentInnings.total_wickets}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Overs: {currentInnings.total_overs}{match.overs ? `/${match.overs}` : ''}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Target className="w-4 h-4" />
-                    <span>Run Rate: {currentInnings.total_overs > 0 ? (currentInnings.total_runs / Number(currentInnings.total_overs)).toFixed(2) : '0.00'}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Zap className="w-4 h-4" />
-                    <span>Innings {currentInnings.innings_number}</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">
-                {match.status === 'upcoming' ? 'Match has not started yet' : 'No active innings'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="scorecard" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="scorecard">Scorecard</TabsTrigger>
+            <TabsTrigger value="info">Info & Awards</TabsTrigger>
+            <TabsTrigger value="analysis">Analysis</TabsTrigger>
+          </TabsList>
 
-        {/* Ball-by-Ball Commentary */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-lg">Ball-by-Ball Commentary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[400px] pr-4">
-              {deliveries.length > 0 ? (
-                <div className="space-y-3">
-                  {deliveries.map((delivery) => (
-                    <div
-                      key={delivery.id}
-                      className={`p-3 rounded-lg border ${
-                        delivery.is_wicket
-                          ? 'bg-destructive/10 border-destructive/30'
-                          : delivery.is_six
-                          ? 'bg-primary/10 border-primary/30'
-                          : delivery.is_boundary
-                          ? 'bg-green-500/10 border-green-500/30'
-                          : 'bg-muted/50 border-border'
-                      }`}
-                    >
-                      <p className="font-medium text-foreground">
-                        {getDeliveryDescription(delivery)}
-                      </p>
+          <TabsContent value="scorecard" className="space-y-6">
+            {/* Scoreboard */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Trophy className="w-5 h-5 text-primary" />
+                  Live Score
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {currentInnings ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Batting</p>
+                        <p className="text-xl font-bold text-foreground">{getBattingTeamName()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-4xl font-bold text-primary">
+                          {currentInnings.total_runs}/{currentInnings.total_wickets}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Overs: {currentInnings.total_overs}{match.overs ? `/${match.overs}` : ''}
+                        </p>
+                      </div>
                     </div>
-                  ))}
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Target className="w-4 h-4" />
+                        <span>Run Rate: {currentInnings.total_overs > 0 ? (currentInnings.total_runs / Number(currentInnings.total_overs)).toFixed(2) : '0.00'}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Zap className="w-4 h-4" />
+                        <span>Innings {currentInnings.innings_number}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                    {match.status === 'upcoming' ? 'Match has not started yet' : 'No active innings'}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Fall of Wickets */}
+            <FallOfWickets wickets={fallOfWickets} />
+
+            {/* Ball-by-Ball Commentary */}
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-lg">Ball-by-Ball Commentary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px] pr-4">
+                  {deliveries.length > 0 ? (
+                    <div className="space-y-3">
+                      {deliveries.map((delivery) => (
+                        <div
+                          key={delivery.id}
+                          className={`p-3 rounded-lg border ${
+                            delivery.is_wicket
+                              ? 'bg-destructive/10 border-destructive/30'
+                              : delivery.is_six
+                              ? 'bg-primary/10 border-primary/30'
+                              : delivery.is_boundary
+                              ? 'bg-green-500/10 border-green-500/30'
+                              : 'bg-muted/50 border-border'
+                          }`}
+                        >
+                          <p className="font-medium text-foreground">
+                            {getDeliveryDescription(delivery)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-center py-8">
+                      No deliveries yet. Commentary will appear here as the match progresses.
+                    </p>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="info" className="space-y-6">
+            {/* Match Info */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Info className="w-5 h-5 text-primary" />
+                  Match Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Match Type</p>
+                    <p className="font-medium text-foreground">{match.match_type.toUpperCase()}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Overs</p>
+                    <p className="font-medium text-foreground">{match.overs || 'Unlimited'}</p>
+                  </div>
+                  {match.toss_winner_id && (
+                    <>
+                      <div>
+                        <p className="text-muted-foreground">Toss Winner</p>
+                        <p className="font-medium text-foreground">
+                          {match.toss_winner_id === teams.team1?.id ? teams.team1?.name : teams.team2?.name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Elected to</p>
+                        <p className="font-medium text-foreground capitalize">{match.toss_decision}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-8">
-                  No deliveries yet. Commentary will appear here as the match progresses.
-                </p>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+
+            {/* Awards Section - Only for completed matches */}
+            <MatchAwards
+              playerOfMatch={playerOfMatch}
+              bestBatsman={bestBatsman}
+              bestBowler={bestBowler}
+              starPerformances={starPerformances}
+              matchStatus={match.status || ''}
+            />
+          </TabsContent>
+
+          <TabsContent value="analysis" className="space-y-6">
+            {/* Wagon Wheel */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Wagon Wheel</CardTitle>
+                {uniqueBatsmen.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Badge
+                      variant={selectedBatsmanForWheel === null ? 'default' : 'outline'}
+                      className="cursor-pointer"
+                      onClick={() => setSelectedBatsmanForWheel(null)}
+                    >
+                      All Batsmen
+                    </Badge>
+                    {uniqueBatsmen.map(b => (
+                      <Badge
+                        key={b.id}
+                        variant={selectedBatsmanForWheel === b.id ? 'default' : 'outline'}
+                        className="cursor-pointer"
+                        onClick={() => setSelectedBatsmanForWheel(b.id)}
+                      >
+                        {b.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent>
+                {wagonWheelShots.length > 0 ? (
+                  <WagonWheel 
+                    shots={wagonWheelShots}
+                    batsmanName={selectedBatsmanForWheel ? profiles.get(selectedBatsmanForWheel)?.full_name : undefined}
+                  />
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                    No shot data available yet. Shot locations will appear as runs are scored.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
