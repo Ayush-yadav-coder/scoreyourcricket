@@ -42,6 +42,8 @@ interface BowlingScore {
   maidens: number;
   runs_conceded: number;
   wickets: number;
+  wides: number;
+  no_balls: number;
   is_current_bowler: boolean;
 }
 
@@ -626,7 +628,25 @@ const Scoring: React.FC = () => {
       if (isLegalDelivery) {
         setBallsInOver(newBallsInOver);
         setCurrentOver(newOver);
+        
+        // Strike rotation for byes and leg byes when odd runs are taken
+        if (striker && nonStriker && runs % 2 === 1) {
+          await supabase.from('batting_scores').update({ is_striker: true }).eq('id', nonStriker.id);
+          await supabase.from('batting_scores').update({ is_striker: false }).eq('id', striker.id);
+          const tempStriker = striker;
+          setStriker(nonStriker);
+          setNonStriker(tempStriker);
+        }
+        
+        // End of over - swap strike and change bowler
         if (newBallNumber >= 6) {
+          if (striker && nonStriker) {
+            await supabase.from('batting_scores').update({ is_striker: true }).eq('id', nonStriker.id);
+            await supabase.from('batting_scores').update({ is_striker: false }).eq('id', striker.id);
+            const tempStriker = striker;
+            setStriker(nonStriker);
+            setNonStriker(tempStriker);
+          }
           setShowSelectBowler(true);
         }
       }
@@ -901,10 +921,6 @@ const Scoring: React.FC = () => {
         loading={savingScore}
       />
     </div>
-  );
-};
-
-export default Scoring;
   );
 };
 
