@@ -33,25 +33,34 @@ interface Player {
   full_name: string;
 }
 
+interface Batsman {
+  id: string;
+  batsman_id: string;
+  name: string;
+  is_striker: boolean;
+}
+
 interface DismissalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   bowlerName: string;
   fieldingPlayers: { player_id: string; profiles: Player }[];
-  onConfirm: (dismissalType: DismissalType, fielderId?: string) => void;
+  striker?: Batsman;
+  nonStriker?: Batsman;
+  onConfirm: (dismissalType: DismissalType, fielderId?: string, dismissedBatsmanId?: string) => void;
   loading?: boolean;
 }
 
-const dismissalTypes: { value: DismissalType; label: string; needsFielder: boolean }[] = [
-  { value: 'bowled', label: 'Bowled', needsFielder: false },
-  { value: 'caught', label: 'Caught', needsFielder: true },
-  { value: 'lbw', label: 'LBW (Leg Before Wicket)', needsFielder: false },
-  { value: 'run_out', label: 'Run Out', needsFielder: true },
-  { value: 'stumped', label: 'Stumped', needsFielder: true },
-  { value: 'hit_wicket', label: 'Hit Wicket', needsFielder: false },
-  { value: 'retired', label: 'Retired', needsFielder: false },
-  { value: 'handled_ball', label: 'Handled Ball', needsFielder: false },
-  { value: 'obstructing_field', label: 'Obstructing the Field', needsFielder: false },
+const dismissalTypes: { value: DismissalType; label: string; needsFielder: boolean; needsBatsmanChoice: boolean }[] = [
+  { value: 'bowled', label: 'Bowled', needsFielder: false, needsBatsmanChoice: false },
+  { value: 'caught', label: 'Caught', needsFielder: true, needsBatsmanChoice: false },
+  { value: 'lbw', label: 'LBW (Leg Before Wicket)', needsFielder: false, needsBatsmanChoice: false },
+  { value: 'run_out', label: 'Run Out', needsFielder: true, needsBatsmanChoice: true },
+  { value: 'stumped', label: 'Stumped', needsFielder: true, needsBatsmanChoice: false },
+  { value: 'hit_wicket', label: 'Hit Wicket', needsFielder: false, needsBatsmanChoice: false },
+  { value: 'retired', label: 'Retired', needsFielder: false, needsBatsmanChoice: false },
+  { value: 'handled_ball', label: 'Handled Ball', needsFielder: false, needsBatsmanChoice: false },
+  { value: 'obstructing_field', label: 'Obstructing the Field', needsFielder: false, needsBatsmanChoice: false },
 ];
 
 const DismissalDialog: React.FC<DismissalDialogProps> = ({
@@ -59,20 +68,31 @@ const DismissalDialog: React.FC<DismissalDialogProps> = ({
   onOpenChange,
   bowlerName,
   fieldingPlayers,
+  striker,
+  nonStriker,
   onConfirm,
   loading,
 }) => {
   const [selectedType, setSelectedType] = useState<DismissalType>('bowled');
   const [fielderId, setFielderId] = useState<string>('');
+  const [dismissedBatsmanId, setDismissedBatsmanId] = useState<string>('striker');
 
   const selectedDismissal = dismissalTypes.find((d) => d.value === selectedType);
   const needsFielder = selectedDismissal?.needsFielder || false;
+  const needsBatsmanChoice = selectedDismissal?.needsBatsmanChoice || false;
 
   const handleConfirm = () => {
-    onConfirm(selectedType, needsFielder ? fielderId : undefined);
+    let batsmanId: string | undefined;
+    
+    if (needsBatsmanChoice) {
+      batsmanId = dismissedBatsmanId === 'striker' ? striker?.id : nonStriker?.id;
+    }
+    
+    onConfirm(selectedType, needsFielder ? fielderId : undefined, batsmanId);
   };
 
-  const canConfirm = !needsFielder || (needsFielder && fielderId);
+  const canConfirm = (!needsFielder || (needsFielder && fielderId)) && 
+                     (!needsBatsmanChoice || dismissedBatsmanId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -87,6 +107,7 @@ const DismissalDialog: React.FC<DismissalDialogProps> = ({
             onValueChange={(v) => {
               setSelectedType(v as DismissalType);
               setFielderId('');
+              setDismissedBatsmanId('striker');
             }}
           >
             <div className="grid grid-cols-1 gap-2">
@@ -105,6 +126,41 @@ const DismissalDialog: React.FC<DismissalDialogProps> = ({
               ))}
             </div>
           </RadioGroup>
+
+          {/* Run Out - Select which batsman is out */}
+          {needsBatsmanChoice && striker && nonStriker && (
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">Which batsman is out?</Label>
+              <RadioGroup
+                value={dismissedBatsmanId}
+                onValueChange={setDismissedBatsmanId}
+                className="grid grid-cols-2 gap-3"
+              >
+                <Label
+                  className={`flex flex-col items-center gap-2 p-4 rounded-lg border cursor-pointer transition-all ${
+                    dismissedBatsmanId === 'striker'
+                      ? 'border-destructive bg-destructive/10'
+                      : 'border-border hover:border-destructive/50'
+                  }`}
+                >
+                  <RadioGroupItem value="striker" className="sr-only" />
+                  <span className="text-xs text-muted-foreground">Striker</span>
+                  <span className="font-bold text-center">{striker.name}</span>
+                </Label>
+                <Label
+                  className={`flex flex-col items-center gap-2 p-4 rounded-lg border cursor-pointer transition-all ${
+                    dismissedBatsmanId === 'non_striker'
+                      ? 'border-destructive bg-destructive/10'
+                      : 'border-border hover:border-destructive/50'
+                  }`}
+                >
+                  <RadioGroupItem value="non_striker" className="sr-only" />
+                  <span className="text-xs text-muted-foreground">Non-Striker</span>
+                  <span className="font-bold text-center">{nonStriker.name}</span>
+                </Label>
+              </RadioGroup>
+            </div>
+          )}
 
           {needsFielder && (
             <div className="space-y-2">
