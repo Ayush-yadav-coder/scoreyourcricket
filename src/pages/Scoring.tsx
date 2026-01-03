@@ -10,6 +10,7 @@ import CricketField from '@/components/scoring/CricketField';
 import PlayerSelectDialog from '@/components/scoring/PlayerSelectDialog';
 import DismissalDialog from '@/components/scoring/DismissalDialog';
 import ExtrasDialog from '@/components/scoring/ExtrasDialog';
+import BallTimeline from '@/components/scoring/BallTimeline';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRealtimeScoring } from '@/hooks/useRealtimeScoring';
@@ -47,6 +48,19 @@ interface BowlingScore {
   is_current_bowler: boolean;
 }
 
+interface Delivery {
+  id: string;
+  ball_number: number;
+  runs: number;
+  is_wide: boolean;
+  is_no_ball: boolean;
+  is_bye: boolean;
+  is_leg_bye: boolean;
+  is_wicket: boolean;
+  is_boundary: boolean;
+  is_six: boolean;
+}
+
 const Scoring: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
@@ -78,6 +92,9 @@ const Scoring: React.FC = () => {
   
   // Track already batting players
   const [battingPlayerIds, setBattingPlayerIds] = useState<string[]>([]);
+  
+  // Current over deliveries for ball timeline
+  const [currentOverDeliveries, setCurrentOverDeliveries] = useState<Delivery[]>([]);
 
   const refetchInnings = useCallback(async () => {
     if (!innings?.id) return;
@@ -165,8 +182,10 @@ const Scoring: React.FC = () => {
       
       if (inningsData) {
         setInnings(inningsData);
-        setCurrentOver(Math.floor(inningsData.total_overs));
-        setBallsInOver(Math.round((inningsData.total_overs % 1) * 10));
+        const overNum = Math.floor(inningsData.total_overs);
+        const ballNum = Math.round((inningsData.total_overs % 1) * 10);
+        setCurrentOver(overNum);
+        setBallsInOver(ballNum);
         
         // Fetch team players
         await fetchTeamPlayers(inningsData.batting_team_id, inningsData.bowling_team_id);
@@ -176,6 +195,9 @@ const Scoring: React.FC = () => {
         
         // Fetch current bowler
         await fetchCurrentBowler(inningsData.id);
+        
+        // Fetch current over deliveries
+        await fetchCurrentOverDeliveries(inningsData.id, overNum);
       }
     }
   };
@@ -244,6 +266,19 @@ const Scoring: React.FC = () => {
       if (striker && nonStriker) {
         setShowSelectBowler(true);
       }
+    }
+  };
+
+  const fetchCurrentOverDeliveries = async (inningsId: string, overNum: number) => {
+    const { data: deliveries } = await supabase
+      .from('deliveries')
+      .select('*')
+      .eq('innings_id', inningsId)
+      .eq('over_number', overNum)
+      .order('ball_number', { ascending: true });
+    
+    if (deliveries) {
+      setCurrentOverDeliveries(deliveries as Delivery[]);
     }
   };
 
@@ -520,6 +555,27 @@ const Scoring: React.FC = () => {
         runs_conceded: currentBowler.runs_conceded + pendingRuns,
       });
 
+      // Add to current over deliveries for ball timeline
+      const newDelivery: Delivery = {
+        id: `temp-${Date.now()}`,
+        ball_number: newBallNumber,
+        runs: pendingRuns,
+        is_wide: false,
+        is_no_ball: false,
+        is_bye: false,
+        is_leg_bye: false,
+        is_wicket: false,
+        is_boundary: pendingRuns === 4,
+        is_six: pendingRuns === 6,
+      };
+      
+      // Reset deliveries if new over, otherwise add to existing
+      if (newBallNumber >= 6) {
+        setCurrentOverDeliveries([]);
+      } else {
+        setCurrentOverDeliveries([...currentOverDeliveries, newDelivery]);
+      }
+
       setShowShotField(false);
       setSelectedShot(null);
       setPendingRuns(0);
@@ -535,9 +591,27 @@ const Scoring: React.FC = () => {
     }
   };
 
-  const handleWicket = async (dismissalType: string, fielderId?: string) => {
-    if (!striker || !innings || !currentBowler) {
+  const handleWicket = async (dismissalType: string, fielderId?: string, dismissedBatsmanId?: string) => {
+    if (!innings || !currentBowler) {
       toast.error('Missing required data');
+      return;
+    }
+    
+    // For run outs, we need to determine which batsman is out
+    const isRunOut = dismissalType === 'run_out';
+    let outBatsman = striker;
+    let remainingBatsman = nonStriker;
+    
+    if (isRunOut && dismissedBatsmanId && nonStriker) {
+      // Check if the dismissed batsman ID matches non-striker
+      if (dismissedBatsmanId === nonStriker.id) {
+        outBatsman = nonStriker;
+        remainingBatsman = striker;
+      }
+    }
+    
+    if (!outBatsman) {
+      toast.error('No batsman selected for dismissal');
       return;
     }
     
@@ -552,23 +626,42 @@ const Scoring: React.FC = () => {
           bowler_id: currentBowler.bowler_id,
           fielder_id: fielderId || null
         })
-        .eq('id', striker.id);
+        .eq('id', outBatsman.id);
       
       await supabase
         .from('innings')
         .update({ total_wickets: innings.total_wickets + 1 })
         .eq('id', innings.id);
       
-      await supabase
-        .from('bowling_scores')
-        .update({ wickets: currentBowler.wickets + 1 })
-        .eq('id', currentBowler.id);
+      // Only credit bowler for wickets where they are responsible
+      const bowlerGetsCreditDismissals = ['bowled', 'caught', 'lbw', 'stumped', 'hit_wicket'];
+      if (bowlerGetsCreditDismissals.includes(dismissalType)) {
+        await supabase
+          .from('bowling_scores')
+          .update({ wickets: currentBowler.wickets + 1 })
+          .eq('id', currentBowler.id);
+        setCurrentBowler({ ...currentBowler, wickets: currentBowler.wickets + 1 });
+      }
       
       setInnings({ ...innings, total_wickets: innings.total_wickets + 1 });
-      setCurrentBowler({ ...currentBowler, wickets: currentBowler.wickets + 1 });
-      setStriker(null);
+      
+      // Handle run out - if non-striker is out, striker remains
+      if (isRunOut && outBatsman.id === nonStriker?.id) {
+        setNonStriker(null);
+        // Striker stays, need to select new non-striker
+        setShowSelectNonStriker(true);
+      } else {
+        // Striker is out (or any other dismissal)
+        setStriker(remainingBatsman);
+        if (remainingBatsman && remainingBatsman.id !== striker?.id) {
+          // Make the remaining batsman the striker
+          await supabase.from('batting_scores').update({ is_striker: true }).eq('id', remainingBatsman.id);
+        }
+        setNonStriker(null);
+        setShowSelectStriker(true);
+      }
+      
       setShowDismissalDialog(false);
-      setShowSelectStriker(true);
       toast.success('Wicket!');
     } catch (error) {
       console.error('Error recording wicket:', error);
@@ -648,6 +741,28 @@ const Scoring: React.FC = () => {
             setNonStriker(tempStriker);
           }
           setShowSelectBowler(true);
+        }
+      }
+
+      // Add to current over deliveries for ball timeline (only for legal deliveries)
+      if (isLegalDelivery) {
+        const newDelivery: Delivery = {
+          id: `temp-${Date.now()}`,
+          ball_number: newBallNumber,
+          runs: runs,
+          is_wide: false,
+          is_no_ball: false,
+          is_bye: currentExtraType === 'bye',
+          is_leg_bye: currentExtraType === 'leg_bye',
+          is_wicket: false,
+          is_boundary: false,
+          is_six: false,
+        };
+        
+        if (newBallNumber >= 6) {
+          setCurrentOverDeliveries([]);
+        } else {
+          setCurrentOverDeliveries([...currentOverDeliveries, newDelivery]);
         }
       }
 
@@ -794,6 +909,13 @@ const Scoring: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Ball Timeline */}
+        <BallTimeline
+          currentOver={currentOver}
+          deliveries={currentOverDeliveries}
+          ballsInOver={ballsInOver}
+        />
+
         {/* Scoring Buttons */}
         <div className="grid grid-cols-4 gap-3">
           {[0, 1, 2, 3].map((run) => (
@@ -908,6 +1030,18 @@ const Scoring: React.FC = () => {
         onOpenChange={setShowDismissalDialog}
         bowlerName={currentBowler ? getPlayerName(currentBowler.bowler_id) : ''}
         fieldingPlayers={bowlingTeamPlayers}
+        striker={striker ? { 
+          id: striker.id, 
+          batsman_id: striker.batsman_id, 
+          name: getPlayerName(striker.batsman_id),
+          is_striker: true 
+        } : undefined}
+        nonStriker={nonStriker ? { 
+          id: nonStriker.id, 
+          batsman_id: nonStriker.batsman_id, 
+          name: getPlayerName(nonStriker.batsman_id),
+          is_striker: false 
+        } : undefined}
         onConfirm={handleWicket}
         loading={savingScore}
       />
