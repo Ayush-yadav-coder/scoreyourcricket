@@ -9,13 +9,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Circle, Trophy, Target, Zap, Info } from 'lucide-react';
+import { Circle, Trophy, Target, Zap, Info, Download } from 'lucide-react';
 import WagonWheel from '@/components/match/WagonWheel';
 import FallOfWickets from '@/components/match/FallOfWickets';
 import MatchAwards from '@/components/match/MatchAwards';
 import PartnershipAnalysis from '@/components/match/PartnershipAnalysis';
 import OverByOverGraph from '@/components/match/OverByOverGraph';
 import DetailedScorecard from '@/components/match/DetailedScorecard';
+import HeadToHead from '@/components/match/HeadToHead';
+import ScorecardExport from '@/components/match/ScorecardExport';
 
 interface Delivery {
   id: string;
@@ -916,6 +918,35 @@ const LiveMatch = () => {
               starPerformances={starPerformances}
               matchStatus={match.status || ''}
             />
+
+            {/* Head to Head Comparison */}
+            {teams.team1 && teams.team2 && (
+              <HeadToHead
+                team1Id={teams.team1.id}
+                team2Id={teams.team2.id}
+                team1Name={teams.team1.name}
+                team2Name={teams.team2.name}
+              />
+            )}
+
+            {/* Scorecard Export */}
+            {currentInnings && (
+              <ScorecardExport
+                matchData={{
+                  team1Name: teams.team1?.name || 'Team 1',
+                  team2Name: teams.team2?.name || 'Team 2',
+                  team1Score: allInnings.find(i => i.batting_team_id === teams.team1?.id)?.total_runs || 0,
+                  team1Wickets: allInnings.find(i => i.batting_team_id === teams.team1?.id)?.total_wickets || 0,
+                  team1Overs: allInnings.find(i => i.batting_team_id === teams.team1?.id)?.total_overs || 0,
+                  team2Score: allInnings.find(i => i.batting_team_id === teams.team2?.id)?.total_runs || 0,
+                  team2Wickets: allInnings.find(i => i.batting_team_id === teams.team2?.id)?.total_wickets || 0,
+                  team2Overs: allInnings.find(i => i.batting_team_id === teams.team2?.id)?.total_overs || 0,
+                  matchType: match.match_type,
+                  battingScorecard: battingScorecard,
+                  bowlingScorecard: bowlingScorecard,
+                }}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="analysis" className="space-y-6">
