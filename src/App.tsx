@@ -22,6 +22,10 @@ import NewSeries from "./pages/NewSeries";
 import Tournament from "./pages/Tournament";
 import ViewMatches from "./pages/ViewMatches";
 import ViewTournaments from "./pages/ViewTournaments";
+import Messages from "./pages/Messages";
+import EmbedTicker from "./pages/EmbedTicker";
+import ViewSeries from "./pages/ViewSeries";
+import Series from "./pages/Series";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +54,10 @@ const App = () => (
             <Route path="/tournament/:tournamentId" element={<Tournament />} />
             <Route path="/view-matches" element={<ViewMatches />} />
             <Route path="/view-tournaments" element={<ViewTournaments />} />
+            <Route path="/view-series" element={<ViewSeries />} />
+            <Route path="/series/:seriesId" element={<Series />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/embed/ticker" element={<EmbedTicker />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -17,7 +17,8 @@ import {
   Loader2,
   Trophy,
   Target,
-  TrendingUp
+  TrendingUp,
+  MessageCircle
 } from 'lucide-react';
 
 interface PlayerProfile {
@@ -285,25 +286,34 @@ const PlayerProfile: React.FC = () => {
                 </div>
 
                 {user && user.id !== playerId && (
-                  <Button
-                    variant={isFollowing ? "outline" : "default"}
-                    onClick={handleFollow}
-                    disabled={followLoading}
-                  >
-                    {followLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : isFollowing ? (
-                      <>
-                        <UserMinus className="h-4 w-4 mr-2" />
-                        Unfollow
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Follow
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={isFollowing ? "outline" : "default"}
+                      onClick={handleFollow}
+                      disabled={followLoading}
+                    >
+                      {followLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isFollowing ? (
+                        <>
+                          <UserMinus className="h-4 w-4 mr-2" />
+                          Unfollow
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Follow
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(`/messages?user=${playerId}`)}
+                    >
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Message
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
