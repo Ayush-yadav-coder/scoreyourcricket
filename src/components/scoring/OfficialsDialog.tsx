@@ -30,12 +30,12 @@ interface OfficialsDialogProps {
 }
 
 const OFFICIAL_ROLES = [
-  { id: 'umpire_1', name: '1st Umpire', icon: Shield },
-  { id: 'umpire_2', name: '2nd Umpire', icon: Shield },
-  { id: 'umpire_3', name: '3rd Umpire (TV)', icon: Shield },
+  { id: 'umpire', name: '1st Umpire', icon: Shield },
+  { id: 'second_umpire', name: '2nd Umpire', icon: Shield },
+  { id: 'third_umpire', name: '3rd Umpire (TV)', icon: Shield },
   { id: 'scorer', name: '1st Scorer', icon: ClipboardList },
-  { id: 'scorer_2', name: '2nd Scorer', icon: ClipboardList },
-  { id: 'match_referee', name: 'Match Referee', icon: Users },
+  { id: 'second_scorer', name: '2nd Scorer', icon: ClipboardList },
+  { id: 'referee', name: 'Match Referee', icon: Users },
 ];
 
 const OfficialsDialog: React.FC<OfficialsDialogProps> = ({

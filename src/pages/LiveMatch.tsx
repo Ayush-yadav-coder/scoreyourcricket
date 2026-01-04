@@ -13,6 +13,9 @@ import { Circle, Trophy, Target, Zap, Info } from 'lucide-react';
 import WagonWheel from '@/components/match/WagonWheel';
 import FallOfWickets from '@/components/match/FallOfWickets';
 import MatchAwards from '@/components/match/MatchAwards';
+import PartnershipAnalysis from '@/components/match/PartnershipAnalysis';
+import OverByOverGraph from '@/components/match/OverByOverGraph';
+import DetailedScorecard from '@/components/match/DetailedScorecard';
 
 interface Delivery {
   id: string;
@@ -527,6 +530,205 @@ const LiveMatch = () => {
     }));
   };
 
+  const getPartnerships = () => {
+    if (!currentInnings) return [];
+    
+    // Sort deliveries by time
+    const sortedDeliveries = allDeliveries
+      .filter(d => d.innings_id === currentInnings.id)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    
+    if (sortedDeliveries.length === 0) return [];
+
+    const partnerships: {
+      batsman1_name: string;
+      batsman2_name: string;
+      runs: number;
+      balls: number;
+      batsman1_runs: number;
+      batsman2_runs: number;
+      batsman1_balls: number;
+      batsman2_balls: number;
+      wicket_number: number;
+    }[] = [];
+
+    let currentPartnership = {
+      batsman1_id: '',
+      batsman2_id: '',
+      batsman1_runs: 0,
+      batsman2_runs: 0,
+      batsman1_balls: 0,
+      batsman2_balls: 0,
+      runs: 0,
+      balls: 0,
+    };
+    let wicketCount = 0;
+
+    sortedDeliveries.forEach((delivery, index) => {
+      // Initialize partnership on first delivery
+      if (index === 0) {
+        currentPartnership.batsman1_id = delivery.batsman_id;
+        currentPartnership.batsman2_id = sortedDeliveries.find(d => d.batsman_id !== delivery.batsman_id)?.batsman_id || '';
+      }
+
+      // Add to partnership
+      if (!delivery.is_wide) {
+        currentPartnership.balls++;
+        if (delivery.batsman_id === currentPartnership.batsman1_id) {
+          currentPartnership.batsman1_runs += delivery.runs || 0;
+          currentPartnership.batsman1_balls++;
+        } else {
+          currentPartnership.batsman2_runs += delivery.runs || 0;
+          currentPartnership.batsman2_balls++;
+        }
+      }
+      currentPartnership.runs += delivery.runs || 0;
+
+      // If wicket, save partnership and start new one
+      if (delivery.is_wicket) {
+        partnerships.push({
+          batsman1_name: profiles.get(currentPartnership.batsman1_id)?.full_name || 'Unknown',
+          batsman2_name: profiles.get(currentPartnership.batsman2_id)?.full_name || 'Unknown',
+          runs: currentPartnership.runs,
+          balls: currentPartnership.balls,
+          batsman1_runs: currentPartnership.batsman1_runs,
+          batsman2_runs: currentPartnership.batsman2_runs,
+          batsman1_balls: currentPartnership.batsman1_balls,
+          batsman2_balls: currentPartnership.batsman2_balls,
+          wicket_number: wicketCount,
+        });
+        wicketCount++;
+        
+        // Reset for new partnership
+        const newBatsman = sortedDeliveries.slice(index + 1).find(d => 
+          d.batsman_id !== currentPartnership.batsman1_id && 
+          d.batsman_id !== currentPartnership.batsman2_id
+        )?.batsman_id;
+        
+        const survivingBatsman = delivery.batsman_id === currentPartnership.batsman1_id 
+          ? currentPartnership.batsman2_id 
+          : currentPartnership.batsman1_id;
+        
+        currentPartnership = {
+          batsman1_id: survivingBatsman,
+          batsman2_id: newBatsman || '',
+          batsman1_runs: 0,
+          batsman2_runs: 0,
+          batsman1_balls: 0,
+          batsman2_balls: 0,
+          runs: 0,
+          balls: 0,
+        };
+      }
+    });
+
+    // Add current partnership if there are runs
+    if (currentPartnership.runs > 0 || currentPartnership.balls > 0) {
+      partnerships.push({
+        batsman1_name: profiles.get(currentPartnership.batsman1_id)?.full_name || 'Unknown',
+        batsman2_name: profiles.get(currentPartnership.batsman2_id)?.full_name || 'Unknown',
+        runs: currentPartnership.runs,
+        balls: currentPartnership.balls,
+        batsman1_runs: currentPartnership.batsman1_runs,
+        batsman2_runs: currentPartnership.batsman2_runs,
+        batsman1_balls: currentPartnership.batsman1_balls,
+        batsman2_balls: currentPartnership.batsman2_balls,
+        wicket_number: wicketCount,
+      });
+    }
+
+    return partnerships;
+  };
+
+  const getOverByOverData = () => {
+    if (!currentInnings) return [];
+    
+    const deliveriesByOver = new Map<number, { runs: number; wickets: number; hasBoundary: boolean; hasSix: boolean; hasWicket: boolean }>();
+    
+    allDeliveries
+      .filter(d => d.innings_id === currentInnings.id)
+      .forEach(d => {
+        const overNum = d.over_number + 1; // Make it 1-indexed for display
+        const existing = deliveriesByOver.get(overNum) || { runs: 0, wickets: 0, hasBoundary: false, hasSix: false, hasWicket: false };
+        existing.runs += d.runs || 0;
+        if (d.is_wicket) {
+          existing.wickets++;
+          existing.hasWicket = true;
+        }
+        if (d.is_boundary) existing.hasBoundary = true;
+        if (d.is_six) existing.hasSix = true;
+        deliveriesByOver.set(overNum, existing);
+      });
+
+    let cumulativeRuns = 0;
+    const overData: { over: number; runs: number; cumulativeRuns: number; wickets: number; isBoundary: boolean; isSix: boolean; isWicket: boolean }[] = [];
+    
+    const sortedOvers = Array.from(deliveriesByOver.keys()).sort((a, b) => a - b);
+    sortedOvers.forEach(over => {
+      const data = deliveriesByOver.get(over)!;
+      cumulativeRuns += data.runs;
+      overData.push({
+        over,
+        runs: data.runs,
+        cumulativeRuns,
+        wickets: data.wickets,
+        isBoundary: data.hasBoundary,
+        isSix: data.hasSix,
+        isWicket: data.hasWicket,
+      });
+    });
+
+    return overData;
+  };
+
+  const getBattingScorecard = () => {
+    if (!currentInnings) return [];
+    
+    return battingScores
+      .filter(bs => {
+        // Find if this batting score belongs to current innings
+        const delivery = allDeliveries.find(d => d.batsman_id === bs.batsman_id && d.innings_id === currentInnings.id);
+        return delivery !== undefined || battingScores.some(b => b.batsman_id === bs.batsman_id);
+      })
+      .map(bs => {
+        const profile = profiles.get(bs.batsman_id);
+        const bowler = bs.bowler_id ? profiles.get(bs.bowler_id) : null;
+        return {
+          batsman_id: bs.batsman_id,
+          batsman_name: profile?.full_name || 'Unknown',
+          runs: bs.runs,
+          balls_faced: bs.balls_faced,
+          fours: bs.fours,
+          sixes: bs.sixes,
+          strike_rate: bs.balls_faced > 0 ? (bs.runs / bs.balls_faced) * 100 : 0,
+          is_out: bs.is_out,
+          dismissal_type: bs.dismissal_type,
+          bowler_name: bowler?.full_name || null,
+          fielder_name: null, // Would need to add fielder tracking
+        };
+      })
+      .sort((a, b) => (b.runs || 0) - (a.runs || 0));
+  };
+
+  const getBowlingScorecard = () => {
+    if (!currentInnings) return [];
+    
+    return bowlingScores
+      .map(bs => {
+        const profile = profiles.get(bs.bowler_id);
+        return {
+          bowler_id: bs.bowler_id,
+          bowler_name: profile?.full_name || 'Unknown',
+          overs: bs.overs,
+          maidens: bs.maidens,
+          runs_conceded: bs.runs_conceded,
+          wickets: bs.wickets,
+          economy: bs.overs > 0 ? bs.runs_conceded / bs.overs : 0,
+        };
+      })
+      .sort((a, b) => b.wickets - a.wickets || a.economy - b.economy);
+  };
+
   if (loading) {
     return (
       <MainLayout>
@@ -553,6 +755,10 @@ const LiveMatch = () => {
   const wagonWheelShots = getWagonWheelShots(selectedBatsmanForWheel || undefined);
   const { playerOfMatch, bestBatsman, bestBowler, starPerformances } = getPlayerPerformances();
   const uniqueBatsmen = getUniqueBatsmen();
+  const partnerships = getPartnerships();
+  const overByOverData = getOverByOverData();
+  const battingScorecard = getBattingScorecard();
+  const bowlingScorecard = getBowlingScorecard();
 
   return (
     <MainLayout>
@@ -713,6 +919,25 @@ const LiveMatch = () => {
           </TabsContent>
 
           <TabsContent value="analysis" className="space-y-6">
+            {/* Detailed Scorecard */}
+            {currentInnings && (
+              <DetailedScorecard
+                battingTeamName={getBattingTeamName()}
+                bowlingTeamName={currentInnings.batting_team_id === teams.team1?.id ? teams.team2?.name || 'Team 2' : teams.team1?.name || 'Team 1'}
+                battingScorecard={battingScorecard}
+                bowlingScorecard={bowlingScorecard}
+                totalRuns={currentInnings.total_runs}
+                totalWickets={currentInnings.total_wickets}
+                totalOvers={currentInnings.total_overs}
+              />
+            )}
+
+            {/* Partnership Analysis */}
+            <PartnershipAnalysis partnerships={partnerships} />
+
+            {/* Over-by-over Graph */}
+            <OverByOverGraph overData={overByOverData} teamName={getBattingTeamName()} />
+
             {/* Wagon Wheel */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-2">

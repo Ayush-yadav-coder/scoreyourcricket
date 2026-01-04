@@ -87,17 +87,54 @@ const LiveStreamDialog: React.FC<LiveStreamDialogProps> = ({
 
   const requestCameraAccess = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, 
-        audio: true 
-      });
+      // First check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error('Camera access is not supported in this browser');
+        return;
+      }
+
+      // Try to get video first, audio is optional
+      let mediaStream: MediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: { ideal: 'environment' } }, 
+          audio: true 
+        });
+      } catch (audioError) {
+        // If audio fails, try video only
+        console.warn('Audio access failed, trying video only:', audioError);
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: { ideal: 'environment' } }
+        });
+      }
+      
       setStream(mediaStream);
       setCameraGranted(true);
       setStep('choice');
       toast.success('Camera access granted!');
-    } catch (error) {
-      console.error('Camera access denied:', error);
-      toast.error('Camera access denied. Please allow camera access to go live.');
+    } catch (error: any) {
+      console.error('Camera access error:', error);
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        toast.error('Camera permission denied. Please allow camera access in your browser settings.');
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        toast.error('No camera found on this device.');
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        toast.error('Camera is already in use by another application.');
+      } else if (error.name === 'OverconstrainedError') {
+        // Try with simpler constraints
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setStream(fallbackStream);
+          setCameraGranted(true);
+          setStep('choice');
+          toast.success('Camera access granted!');
+          return;
+        } catch (fallbackError) {
+          toast.error('Could not access camera with current settings.');
+        }
+      } else {
+        toast.error('Failed to access camera. Please check your permissions.');
+      }
     }
   };
 
