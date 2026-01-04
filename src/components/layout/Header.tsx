@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Search, User, LogOut, Trophy, Users, Calendar, Play, ChevronDown, Medal } from 'lucide-react';
+import { Menu, Search, User, LogOut, Trophy, Calendar, Play, ChevronDown, Medal, MessageCircle, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +20,37 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (user) {
+      fetchUnreadCount();
+      
+      // Subscribe to new messages
+      const channel = supabase
+        .channel('unread-messages')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` },
+          () => fetchUnreadCount()
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user]);
+
+  const fetchUnreadCount = async () => {
+    if (!user) return;
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_id', user.id)
+      .eq('is_read', false);
+    setUnreadCount(count || 0);
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +68,10 @@ const Header: React.FC = () => {
     { icon: User, label: 'View Profile', href: '/profile' },
     { icon: Trophy, label: 'Our Career', href: '/career' },
     { icon: Medal, label: 'Leaderboard', href: '/leaderboard' },
-    { icon: Calendar, label: 'Our Matches', href: '/matches' },
+    { icon: MessageCircle, label: 'Messages', href: '/messages' },
+    { icon: Calendar, label: 'View Matches', href: '/view-matches' },
+    { icon: List, label: 'View Series', href: '/view-series' },
+    { icon: Trophy, label: 'View Tournaments', href: '/view-tournaments' },
     { icon: Play, label: 'Start a Match', href: '/new-match' },
     { icon: Trophy, label: 'Start a Tournament', href: '/new-tournament' },
     { icon: Calendar, label: 'Start a Series', href: '/new-series' },
@@ -96,8 +132,27 @@ const Header: React.FC = () => {
           </div>
         </form>
 
-        {/* Right side - Profile */}
-        <div className="flex items-center gap-3">
+        {/* Right side - Messages and Profile */}
+        <div className="flex items-center gap-2">
+          {user && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              onClick={() => navigate('/messages')}
+            >
+              <MessageCircle className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                >
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Badge>
+              )}
+            </Button>
+          )}
+          
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -116,6 +171,15 @@ const Header: React.FC = () => {
                 <DropdownMenuItem onClick={() => navigate('/career')}>
                   <Trophy className="mr-2 h-4 w-4" />
                   Career Stats
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/messages')}>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Messages
+                  {unreadCount > 0 && (
+                    <Badge variant="destructive" className="ml-auto">
+                      {unreadCount}
+                    </Badge>
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
