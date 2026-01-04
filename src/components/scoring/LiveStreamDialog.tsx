@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Camera, Video, VideoOff, Check, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Camera, Video, VideoOff, Check, ArrowRight, ArrowLeft, Palette } from 'lucide-react';
 import { toast } from 'sonner';
+import TickerCustomizer, { TickerCustomization } from './TickerCustomizer';
 
 interface TickerStyle {
   id: string;
@@ -21,6 +22,13 @@ const TICKER_STYLES: TickerStyle[] = [
   { id: 'eng_ind', name: 'England-India Style', preview: 'Dual color with team logos' },
   { id: 't20_wc', name: 'T20 WC Style', preview: 'Blue/Magenta gradient' },
   { id: 'pak_nz', name: 'Pink Style', preview: 'Vibrant pink with flags' },
+  // New ticker styles based on user's reference images
+  { id: 'ind_aus', name: 'India-Australia', preview: 'Dark gradient with day/session info' },
+  { id: 'pak_nz_2', name: 'Pakistan-NZ', preview: 'Green with player photos layout' },
+  { id: 'west_indies', name: 'West Indies', preview: 'Maroon with partnership info' },
+  { id: 'ban_sl', name: 'Bangladesh-SL', preview: 'Green top with match info' },
+  { id: 'sl_aus', name: 'SriLanka-Australia', preview: 'Blue with lead info' },
+  { id: 'eng_pak', name: 'England-Pakistan', preview: 'Gradient with speed info' },
 ];
 
 interface LiveStreamDialogProps {
@@ -40,7 +48,7 @@ interface LiveStreamDialogProps {
     requiredRunRate?: number;
     target?: number;
   };
-  onStartStream: (withTicker: boolean, tickerStyle: string) => void;
+  onStartStream: (withTicker: boolean, tickerStyle: string, customization?: TickerCustomization) => void;
 }
 
 type Step = 'permission' | 'choice' | 'ticker_select' | 'preview';
@@ -55,6 +63,8 @@ const LiveStreamDialog: React.FC<LiveStreamDialogProps> = ({
   const [cameraGranted, setCameraGranted] = useState(false);
   const [selectedTicker, setSelectedTicker] = useState<string>('ipl');
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [showCustomizer, setShowCustomizer] = useState(false);
+  const [tickerCustomization, setTickerCustomization] = useState<TickerCustomization | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -100,8 +110,13 @@ const LiveStreamDialog: React.FC<LiveStreamDialogProps> = ({
   };
 
   const handleStartStream = () => {
-    onStartStream(step === 'preview' && selectedTicker !== '', selectedTicker);
+    onStartStream(step === 'preview' && selectedTicker !== '', selectedTicker, tickerCustomization || undefined);
     onOpenChange(false);
+  };
+
+  const handleSaveCustomization = (customization: TickerCustomization) => {
+    setTickerCustomization(customization);
+    toast.success('Ticker customization saved!');
   };
 
   const renderTickerPreview = () => {
@@ -126,6 +141,18 @@ const LiveStreamDialog: React.FC<LiveStreamDialogProps> = ({
         return <T20WCTicker {...matchData} />;
       case 'pak_nz':
         return <PinkTicker {...matchData} />;
+      case 'ind_aus':
+        return <IndAusTicker {...matchData} />;
+      case 'pak_nz_2':
+        return <PakNZTicker {...matchData} />;
+      case 'west_indies':
+        return <WestIndiesTicker {...matchData} />;
+      case 'ban_sl':
+        return <BanSLTicker {...matchData} />;
+      case 'sl_aus':
+        return <SLAusTicker {...matchData} />;
+      case 'eng_pak':
+        return <EngPakTicker {...matchData} />;
       default:
         return <IPLTicker {...matchData} />;
     }
@@ -219,6 +246,10 @@ const LiveStreamDialog: React.FC<LiveStreamDialogProps> = ({
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
+              <Button variant="outline" onClick={() => setShowCustomizer(true)} className="gap-2">
+                <Palette className="h-4 w-4" />
+                Customize
+              </Button>
               <Button onClick={() => setStep('preview')} className="flex-1">
                 Preview
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -256,6 +287,14 @@ const LiveStreamDialog: React.FC<LiveStreamDialogProps> = ({
           </div>
         )}
       </DialogContent>
+
+      {/* Ticker Customizer Dialog */}
+      <TickerCustomizer
+        open={showCustomizer}
+        onOpenChange={setShowCustomizer}
+        selectedTicker={selectedTicker}
+        onSave={handleSaveCustomization}
+      />
     </Dialog>
   );
 };
@@ -713,4 +752,335 @@ const PinkTicker: React.FC<TickerProps> = ({
   </div>
 );
 
+// India-Australia Style - Dark gradient with day/session info (Reference Image 1)
+const IndAusTicker: React.FC<TickerProps> = ({
+  battingTeam,
+  bowlingTeam,
+  score,
+  wickets,
+  overs,
+  striker,
+  nonStriker,
+  bowler,
+  currentOverBalls = [],
+}) => (
+  <div className="w-full bg-gradient-to-r from-[#0d1f3c] via-[#1a3a5c] to-[#0d1f3c] text-white text-xs">
+    <div className="flex items-center justify-between py-2 px-3 border-b border-cyan-500/30">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-[8px] font-bold">
+            ☀
+          </div>
+          <span className="font-bold text-orange-400">{battingTeam.toUpperCase()}</span>
+        </div>
+        <span className="text-2xl font-bold text-cyan-400">{score}-{wickets}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] opacity-80">{overs}</span>
+        <span className="font-bold text-green-400">{bowlingTeam.toUpperCase()}</span>
+        <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center text-[8px] font-bold">
+          🏏
+        </div>
+      </div>
+      <div className="bg-[#1e3a5f] px-3 py-1 rounded">
+        <span className="text-[10px] font-medium">DAY 1</span>
+        <br />
+        <span className="text-[10px] opacity-70">SESSION 1</span>
+      </div>
+      <div className="text-right">
+        <span className="text-[10px] opacity-70">LEAD BY</span>
+        <br />
+        <span className="font-bold text-yellow-400">{Math.abs(score - 200)} RUNS</span>
+      </div>
+    </div>
+    <div className="flex items-center justify-between py-1.5 px-3 bg-[#0a1628]">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px]">▶</span>
+          <span className="font-bold text-yellow-300">{striker.name.split(' ')[0].toUpperCase()}</span>
+          <span className="font-bold">{striker.runs}</span>
+          <span className="text-[10px] opacity-70">{striker.balls}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="font-medium">{nonStriker.name.split(' ')[0].toUpperCase()}</span>
+          <span>{nonStriker.runs}</span>
+          <span className="text-[10px] opacity-70">{nonStriker.balls}</span>
+        </div>
+      </div>
+      <div className="text-[10px] opacity-70">SPEED 82.4 km/h</div>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] opacity-70">THIS OVER</span>
+        {currentOverBalls.slice(-6).map((ball, i) => (
+          <span key={i} className="w-4 h-4 rounded-sm bg-[#1e3a5f] flex items-center justify-center text-[8px]">
+            {ball}
+          </span>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// Pakistan-NZ Style - Green with player layout (Reference Image 2)
+const PakNZTicker: React.FC<TickerProps> = ({
+  battingTeam,
+  bowlingTeam,
+  score,
+  wickets,
+  overs,
+  striker,
+  nonStriker,
+  bowler,
+}) => (
+  <div className="w-full flex text-white text-xs">
+    <div className="bg-gradient-to-r from-[#004d00] to-[#006600] flex items-center gap-4 py-2 px-4 flex-1">
+      <div className="flex items-center gap-2">
+        <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center">
+          <span className="text-[8px] text-green-800">⭐</span>
+        </div>
+        <span className="font-bold text-green-200">{battingTeam.substring(0, 3).toUpperCase()}</span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-xl font-bold">{score}-{wickets}</span>
+        <span className="text-[10px] opacity-70">{overs}</span>
+      </div>
+      <div className="h-8 w-px bg-white/30" />
+      <div className="flex items-center gap-3">
+        <div className="flex flex-col items-center">
+          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs">👤</div>
+          <span className="font-medium">{striker.name.split(' ')[0].toUpperCase()}</span>
+          <span className="font-bold">{striker.runs} <span className="text-[10px]">{striker.balls}</span></span>
+        </div>
+        <div className="flex flex-col items-center">
+          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs">👤</div>
+          <span className="font-medium">{nonStriker.name.split(' ')[0].toUpperCase()}</span>
+          <span>{nonStriker.runs} <span className="text-[10px]">{nonStriker.balls}</span></span>
+        </div>
+      </div>
+    </div>
+    <div className="bg-gradient-to-r from-[#2d2d2d] to-[#1a1a1a] flex items-center gap-3 py-2 px-4">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs">👤</div>
+        <div className="flex flex-col">
+          <span className="font-medium text-cyan-300">{bowler.name.split(' ')[0].toUpperCase()}</span>
+          <span className="font-bold">{bowler.wickets}-{bowler.runs} <span className="text-[10px]">{bowler.overs}</span></span>
+        </div>
+      </div>
+      <span className="text-[10px] opacity-70">DAY 1, SESSION 3</span>
+      <div className="flex items-center gap-1">
+        <span className="font-bold">{bowlingTeam.substring(0, 2).toUpperCase()}</span>
+        <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center text-[8px]">🥝</div>
+      </div>
+    </div>
+  </div>
+);
+
+// West Indies Style - Maroon with partnership info (Reference Image 3)
+const WestIndiesTicker: React.FC<TickerProps> = ({
+  battingTeam,
+  score,
+  wickets,
+  overs,
+  striker,
+  nonStriker,
+  bowler,
+  currentOverBalls = [],
+}) => (
+  <div className="w-full flex text-white text-xs">
+    <div className="bg-gradient-to-r from-[#800020] to-[#a0002a] flex-1 py-2 px-4 flex items-center gap-4 rounded-l-lg">
+      <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
+        <span className="text-[10px] text-[#800020]">🏏</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px]">▶</span>
+        <span className="font-bold">{striker.name.toUpperCase()}</span>
+        <span className="font-bold text-lg">{striker.runs}</span>
+        <span className="text-[10px] opacity-70">({striker.balls})</span>
+        <span className="text-[10px] bg-white/20 px-1 rounded">168.3</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="font-medium">{nonStriker.name.toUpperCase()}</span>
+        <span>{nonStriker.runs}</span>
+        <span className="text-[10px] opacity-70">({nonStriker.balls})</span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-xl font-bold">{score}-{wickets}</span>
+      </div>
+    </div>
+    <div className="bg-[#1a1a2e] flex items-center gap-3 py-2 px-4">
+      <div className="flex flex-col items-center">
+        <span className="text-[10px] opacity-70">TRAIL BY</span>
+        <span className="text-xl font-bold text-yellow-400">122</span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-[10px] opacity-70">PARTNERSHIP</span>
+        <span className="text-[10px]">34 RUNS OFF 104 BALLS</span>
+      </div>
+    </div>
+    <div className="bg-gradient-to-r from-[#1a237e] to-[#283593] flex items-center gap-3 py-2 px-4 rounded-r-lg">
+      <span className="font-bold text-yellow-300">{bowler.name.toUpperCase()}</span>
+      <span className="font-bold">{bowler.wickets}-{bowler.runs}</span>
+      <span className="text-[10px]">({bowler.overs})</span>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] opacity-70">THIS OVER</span>
+        {currentOverBalls.slice(-3).map((ball, i) => (
+          <span key={i} className="w-4 h-4 rounded-full border border-white/50 flex items-center justify-center text-[8px]">
+            {ball}
+          </span>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// Bangladesh-SriLanka Style - Green top with match info (Reference Image 4)
+const BanSLTicker: React.FC<TickerProps> = ({
+  battingTeam,
+  bowlingTeam,
+  score,
+  wickets,
+  overs,
+  striker,
+  nonStriker,
+  bowler,
+}) => (
+  <div className="w-full">
+    <div className="bg-gradient-to-r from-[#006a4e] via-[#00854d] to-[#006a4e] text-white text-xs py-1 px-4 flex items-center justify-between rounded-t-lg border-b-2 border-red-500">
+      <div className="flex items-center gap-3">
+        <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center text-[8px]">🇧🇩</div>
+        <span className="font-bold">{battingTeam.toUpperCase()}</span>
+        <span className="text-xl font-bold text-yellow-300">{score}-{wickets}</span>
+        <span className="text-[10px] opacity-80">{overs}</span>
+      </div>
+      <div className="bg-[#004d00] px-3 py-0.5 rounded">
+        <span className="font-medium">{battingTeam.toUpperCase()} v {bowlingTeam.toUpperCase()} - SECOND TEST</span>
+      </div>
+      <div className="text-right">
+        <span className="text-[10px]">DAY 2, SESSION 2</span>
+      </div>
+    </div>
+    <div className="bg-[#1a1a2e] text-white text-xs py-1.5 px-4 flex items-center justify-between rounded-b-lg">
+      <div className="flex items-center gap-3">
+        <span className="font-medium">{bowler.name.split(' ')[0].toUpperCase()}</span>
+        <span className="opacity-70">{bowler.runs}</span>
+        <span className="text-[10px]">{bowler.overs}</span>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px]">▶</span>
+          <span className="font-bold text-green-400">{striker.name.toUpperCase()}</span>
+          <span className="font-bold">{striker.runs}</span>
+          <span className="text-[10px] opacity-70">{striker.balls}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="font-medium text-blue-400">{bowler.name.split(' ')[0].toUpperCase()}</span>
+        <span>{bowler.wickets}-{bowler.runs}</span>
+        <span className="text-[10px]">{bowler.overs}</span>
+        <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[8px]">🇱🇰</div>
+      </div>
+    </div>
+  </div>
+);
+
+// SriLanka-Australia Style - Blue with lead info (Reference Image 5)
+const SLAusTicker: React.FC<TickerProps> = ({
+  battingTeam,
+  bowlingTeam,
+  score,
+  wickets,
+  overs,
+  striker,
+  nonStriker,
+  bowler,
+}) => (
+  <div className="w-full">
+    <div className="bg-[#1565c0] text-white text-[10px] py-0.5 px-4 flex items-center justify-start rounded-t-lg">
+      <span className="font-medium">{battingTeam.toUpperCase()} LEAD BY 190 RUNS</span>
+    </div>
+    <div className="bg-gradient-to-r from-[#0d47a1] to-[#1565c0] text-white text-xs py-2 px-4 flex items-center justify-between rounded-b-lg">
+      <div className="flex items-center gap-3">
+        <div className="w-5 h-5 rounded-sm bg-blue-800 flex items-center justify-center text-[8px]">🇱🇰</div>
+        <span className="font-bold">{battingTeam.substring(0, 2).toUpperCase()}</span>
+        <span className="text-xl font-bold text-yellow-300">{score}-{wickets}</span>
+        <span className="text-[10px] opacity-80">{overs}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="font-bold text-yellow-300">{striker.name.toUpperCase()}</span>
+        <span className="font-bold">{striker.runs}</span>
+        <span className="text-[10px]">{striker.balls}</span>
+        <span className="opacity-50">/</span>
+        <span className="font-medium">{nonStriker.name.toUpperCase()}</span>
+        <span>{nonStriker.runs}</span>
+        <span className="text-[10px]">{nonStriker.balls}</span>
+      </div>
+      <div className="flex items-center gap-2 bg-[#ffd700] text-black px-3 py-1 rounded">
+        <div className="w-4 h-4 rounded-full bg-green-600 flex items-center justify-center text-[8px]">🇦🇺</div>
+        <span className="font-bold">{bowler.name.toUpperCase()}</span>
+        <span>{bowler.wickets}-{bowler.runs}</span>
+        <span className="text-[10px]">{bowler.overs}</span>
+      </div>
+    </div>
+  </div>
+);
+
+// England-Pakistan Style - Gradient with speed info (Reference Image 6)
+const EngPakTicker: React.FC<TickerProps> = ({
+  battingTeam,
+  bowlingTeam,
+  score,
+  wickets,
+  overs,
+  striker,
+  nonStriker,
+  bowler,
+  runRate = 0,
+}) => (
+  <div className="w-full flex text-white text-xs items-center bg-gradient-to-r from-[#1a1a2e] via-[#2d2d44] to-[#1a1a2e] rounded-full border border-gray-600">
+    <div className="flex items-center gap-2 py-2 px-4">
+      <div className="w-6 h-6 rounded-sm bg-white flex items-center justify-center">
+        <span className="text-[8px] text-red-600">🏴󠁧󠁢󠁥󠁮󠁧󠁿</span>
+      </div>
+      <div className="flex flex-col">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px]">▶</span>
+          <span className="font-medium">{striker.name.split(' ')[0].toUpperCase()}</span>
+          <span className="font-bold">{striker.runs}</span>
+          <span className="text-[10px] opacity-70">{striker.balls}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="font-medium">{nonStriker.name.split(' ')[0].toUpperCase()}</span>
+          <span>{nonStriker.runs}</span>
+          <span className="text-[10px] opacity-70">{nonStriker.balls}</span>
+        </div>
+      </div>
+    </div>
+    <div className="bg-gradient-to-r from-[#00bcd4] to-[#0097a7] px-4 py-2 rounded-full flex items-center gap-2">
+      <span className="text-[10px] opacity-70">{bowlingTeam.substring(0, 3).toUpperCase()} v</span>
+      <span className="font-bold text-yellow-300">{battingTeam.substring(0, 3).toUpperCase()}</span>
+      <span className="text-xl font-bold">{score}-{wickets}</span>
+      <span className="text-[10px]">P3</span>
+      <span className="text-[10px]">{overs}</span>
+    </div>
+    <div className="px-3">
+      <span className="text-[10px] opacity-70">RUN RATE</span>
+      <span className="font-bold ml-1">{runRate.toFixed(2)}</span>
+    </div>
+    <div className="flex items-center gap-2 py-2 px-4">
+      <span className="font-bold text-cyan-300">{bowler.name.split(' ')[0].toUpperCase()}</span>
+      <span>{bowler.wickets}-{bowler.runs}</span>
+      <span className="text-[10px]">{bowler.overs}</span>
+      <div className="flex flex-col text-right">
+        <span className="text-[10px] text-cyan-400">SPEED</span>
+        <span className="text-[10px]">130 KPH / 81 MPH</span>
+      </div>
+      <div className="w-6 h-6 rounded-sm bg-green-700 flex items-center justify-center">
+        <span className="text-[8px]">🇵🇰</span>
+      </div>
+    </div>
+  </div>
+);
+
 export default LiveStreamDialog;
+
+// Export the TickerCustomizer dialog for use in ticker selection
+export { TickerCustomizer };

@@ -75,6 +75,8 @@ interface Match {
   team2_id: string;
   toss_winner_id: string | null;
   toss_decision: string | null;
+  is_live_streaming: boolean | null;
+  stream_url: string | null;
 }
 
 interface Team {
@@ -567,10 +569,13 @@ const LiveMatch = () => {
         </div>
 
         <Tabs defaultValue="scorecard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="scorecard">Scorecard</TabsTrigger>
             <TabsTrigger value="info">Info & Awards</TabsTrigger>
             <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            <TabsTrigger value="live" disabled={!match.is_live_streaming}>
+              {match.is_live_streaming ? 'View Live' : 'No Stream'}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="scorecard" className="space-y-6">
@@ -744,6 +749,59 @@ const LiveMatch = () => {
                   <p className="text-muted-foreground text-center py-8">
                     No shot data available yet. Shot locations will appear as runs are scored.
                   </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Live Stream Tab */}
+          <TabsContent value="live" className="space-y-6">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Circle className="w-4 h-4 fill-red-500 text-red-500 animate-pulse" />
+                  Live Match Stream
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {match.is_live_streaming ? (
+                  <div className="space-y-4">
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                      {match.stream_url ? (
+                        <iframe
+                          src={match.stream_url}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <div className="text-center text-white">
+                          <Circle className="w-12 h-12 mx-auto mb-4 fill-red-500 text-red-500 animate-pulse" />
+                          <p className="text-lg font-medium">Live Stream Active</p>
+                          <p className="text-sm opacity-70 mt-2">
+                            The scorer is currently live streaming this match
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                        <span className="font-medium">LIVE</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {teams.team1?.name} vs {teams.team2?.name}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Circle className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-lg font-medium text-muted-foreground">No Live Stream Available</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      This match is not being streamed live at the moment
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>

@@ -12,6 +12,8 @@ import DismissalDialog from '@/components/scoring/DismissalDialog';
 import ExtrasDialog from '@/components/scoring/ExtrasDialog';
 import BallTimeline from '@/components/scoring/BallTimeline';
 import LiveStreamDialog from '@/components/scoring/LiveStreamDialog';
+import MatchBreaksDialog from '@/components/scoring/MatchBreaksDialog';
+import OfficialsDialog from '@/components/scoring/OfficialsDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRealtimeScoring } from '@/hooks/useRealtimeScoring';
@@ -101,6 +103,10 @@ const Scoring: React.FC = () => {
   const [showLiveStreamDialog, setShowLiveStreamDialog] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamTickerStyle, setStreamTickerStyle] = useState<string>('');
+
+  // Match breaks and officials dialogs
+  const [showMatchBreaksDialog, setShowMatchBreaksDialog] = useState(false);
+  const [showOfficialsDialog, setShowOfficialsDialog] = useState(false);
 
   const refetchInnings = useCallback(async () => {
     if (!innings?.id) return;
@@ -830,11 +836,11 @@ const Scoring: React.FC = () => {
                   <FileText className="mr-2 h-4 w-4" />
                   View Full Scorecard
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start" onClick={() => setShowMatchBreaksDialog(true)}>
                   <Clock className="mr-2 h-4 w-4" />
-                  Set Break (Tea/Lunch/Rain)
+                  Set Match Break
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start" onClick={() => setShowOfficialsDialog(true)}>
                   <Users className="mr-2 h-4 w-4" />
                   Add Officials
                 </Button>
@@ -1119,6 +1125,27 @@ const Scoring: React.FC = () => {
           setStreamTickerStyle(tickerStyle);
           toast.success(withTicker ? `Started streaming with ${tickerStyle} ticker!` : 'Started streaming without ticker!');
         }}
+      />
+
+      {/* Match Breaks Dialog */}
+      <MatchBreaksDialog
+        open={showMatchBreaksDialog}
+        onOpenChange={setShowMatchBreaksDialog}
+        matchId={matchId || ''}
+        onBreakSet={(breakType) => {
+          toast.info(`Match paused: ${breakType}`);
+        }}
+        onMatchDeleted={() => {
+          navigate('/');
+        }}
+      />
+
+      {/* Officials Dialog */}
+      <OfficialsDialog
+        open={showOfficialsDialog}
+        onOpenChange={setShowOfficialsDialog}
+        matchId={matchId || ''}
+        allPlayers={[...battingTeamPlayers, ...bowlingTeamPlayers]}
       />
     </div>
   );
