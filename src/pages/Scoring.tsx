@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MoreVertical, Camera, Users, Clock, X, Check } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Camera, Users, Clock, X, Check, FileText, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,6 +11,7 @@ import PlayerSelectDialog from '@/components/scoring/PlayerSelectDialog';
 import DismissalDialog from '@/components/scoring/DismissalDialog';
 import ExtrasDialog from '@/components/scoring/ExtrasDialog';
 import BallTimeline from '@/components/scoring/BallTimeline';
+import LiveStreamDialog from '@/components/scoring/LiveStreamDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRealtimeScoring } from '@/hooks/useRealtimeScoring';
@@ -95,6 +96,11 @@ const Scoring: React.FC = () => {
   
   // Current over deliveries for ball timeline
   const [currentOverDeliveries, setCurrentOverDeliveries] = useState<Delivery[]>([]);
+  
+  // Live streaming state
+  const [showLiveStreamDialog, setShowLiveStreamDialog] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamTickerStyle, setStreamTickerStyle] = useState<string>('');
 
   const refetchInnings = useCallback(async () => {
     if (!innings?.id) return;
@@ -820,6 +826,10 @@ const Scoring: React.FC = () => {
                 <SheetTitle>Match Options</SheetTitle>
               </SheetHeader>
               <div className="mt-6 space-y-4">
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate(`/live/${matchId}`)}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  View Full Scorecard
+                </Button>
                 <Button variant="outline" className="w-full justify-start">
                   <Clock className="mr-2 h-4 w-4" />
                   Set Break (Tea/Lunch/Rain)
@@ -828,9 +838,22 @@ const Scoring: React.FC = () => {
                   <Users className="mr-2 h-4 w-4" />
                   Add Officials
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Camera className="mr-2 h-4 w-4" />
-                  Go Live
+                <Button 
+                  variant="outline" 
+                  className={`w-full justify-start ${isStreaming ? 'bg-red-100 border-red-500 text-red-700' : ''}`}
+                  onClick={() => setShowLiveStreamDialog(true)}
+                >
+                  {isStreaming ? (
+                    <>
+                      <Video className="mr-2 h-4 w-4 text-red-500 animate-pulse" />
+                      Live Streaming
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="mr-2 h-4 w-4" />
+                      Go Live
+                    </>
+                  )}
                 </Button>
               </div>
             </SheetContent>
@@ -1053,6 +1076,49 @@ const Scoring: React.FC = () => {
         extraType={currentExtraType}
         onConfirm={handleExtra}
         loading={savingScore}
+      />
+
+      {/* Live Stream Dialog */}
+      <LiveStreamDialog
+        open={showLiveStreamDialog}
+        onOpenChange={setShowLiveStreamDialog}
+        matchData={{
+          battingTeam: battingTeam?.name || 'Team',
+          bowlingTeam: innings?.batting_team_id === match?.team1?.id ? match?.team2?.name : match?.team1?.name,
+          score: innings?.total_runs || 0,
+          wickets: innings?.total_wickets || 0,
+          overs: innings?.total_overs || 0,
+          striker: {
+            name: striker ? getPlayerName(striker.batsman_id) : 'Striker',
+            runs: striker?.runs || 0,
+            balls: striker?.balls_faced || 0,
+          },
+          nonStriker: {
+            name: nonStriker ? getPlayerName(nonStriker.batsman_id) : 'Non-Striker',
+            runs: nonStriker?.runs || 0,
+            balls: nonStriker?.balls_faced || 0,
+          },
+          bowler: {
+            name: currentBowler ? getPlayerName(currentBowler.bowler_id) : 'Bowler',
+            wickets: currentBowler?.wickets || 0,
+            runs: currentBowler?.runs_conceded || 0,
+            overs: currentBowler?.overs || 0,
+          },
+          currentOverBalls: currentOverDeliveries.map(d => {
+            if (d.is_wicket) return 'W';
+            if (d.is_wide) return 'WD';
+            if (d.is_no_ball) return 'NB';
+            if (d.is_bye) return `${d.runs}B`;
+            if (d.is_leg_bye) return `${d.runs}LB`;
+            return String(d.runs);
+          }),
+          runRate: innings?.total_overs > 0 ? Number((innings.total_runs / innings.total_overs).toFixed(2)) : 0,
+        }}
+        onStartStream={(withTicker, tickerStyle) => {
+          setIsStreaming(true);
+          setStreamTickerStyle(tickerStyle);
+          toast.success(withTicker ? `Started streaming with ${tickerStyle} ticker!` : 'Started streaming without ticker!');
+        }}
       />
     </div>
   );
