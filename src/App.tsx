@@ -17,6 +17,7 @@ import Leaderboard from "./pages/Leaderboard";
 import LiveMatch from "./pages/LiveMatch";
 import NotFound from "./pages/NotFound";
 import NewTournament from "./pages/NewTournament";
+import NewSeries from "./pages/NewSeries";
 import Tournament from "./pages/Tournament";
 import ViewMatches from "./pages/ViewMatches";
 import ViewTournaments from "./pages/ViewTournaments";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/scoring/:matchId" element={<Scoring />} />
             <Route path="/match/:matchId" element={<LiveMatch />} />
             <Route path="/new-tournament" element={<NewTournament />} />
+            <Route path="/new-series" element={<NewSeries />} />
             <Route path="/tournament/:tournamentId" element={<Tournament />} />
             <Route path="/view-matches" element={<ViewMatches />} />
             <Route path="/view-tournaments" element={<ViewTournaments />} />

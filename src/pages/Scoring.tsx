@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MoreVertical, Camera, Users, Clock, X, Check, FileText, Video } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Camera, Users, Clock, X, Check, FileText, Video, StopCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -107,6 +107,10 @@ const Scoring: React.FC = () => {
   // Match breaks and officials dialogs
   const [showMatchBreaksDialog, setShowMatchBreaksDialog] = useState(false);
   const [showOfficialsDialog, setShowOfficialsDialog] = useState(false);
+  
+  // End/declare innings dialog
+  const [showEndInningsDialog, setShowEndInningsDialog] = useState(false);
+  const [showLastBatsmanDialog, setShowLastBatsmanDialog] = useState(false);
 
   const refetchInnings = useCallback(async () => {
     if (!innings?.id) return;
@@ -657,6 +661,18 @@ const Scoring: React.FC = () => {
       
       setInnings({ ...innings, total_wickets: innings.total_wickets + 1 });
       
+      // Check if only one batsman remains (9 wickets fallen)
+      const wicketsAfter = innings.total_wickets + 1;
+      const remainingBatsmen = battingTeamPlayers.length - battingPlayerIds.length;
+      
+      if (wicketsAfter >= 9 || remainingBatsmen <= 1) {
+        // Show last batsman dialog
+        setShowLastBatsmanDialog(true);
+        setShowDismissalDialog(false);
+        toast.info('Last batsman remaining!');
+        return;
+      }
+      
       // Handle run out - if non-striker is out, striker remains
       if (isRunOut && outBatsman.id === nonStriker?.id) {
         setNonStriker(null);
@@ -799,6 +815,76 @@ const Scoring: React.FC = () => {
     return player?.profiles?.full_name || 'Unknown';
   };
 
+  const handleEndInnings = async (declare: boolean) => {
+    if (!innings || !match) return;
+    
+    setSavingScore(true);
+    try {
+      // Mark current innings as completed
+      await supabase
+        .from('innings')
+        .update({ is_completed: true, declared: declare })
+        .eq('id', innings.id);
+      
+      // Check if this is the first innings
+      const { data: allInnings } = await supabase
+        .from('innings')
+        .select('*')
+        .eq('match_id', matchId)
+        .order('innings_number', { ascending: true });
+      
+      if (allInnings && allInnings.length === 1) {
+        // Create second innings
+        const secondBattingTeamId = innings.batting_team_id === match.team1?.id ? match.team2?.id : match.team1?.id;
+        const secondBowlingTeamId = innings.batting_team_id;
+        
+        const { data: newInnings, error } = await supabase
+          .from('innings')
+          .insert({
+            match_id: matchId,
+            innings_number: 2,
+            batting_team_id: secondBattingTeamId,
+            bowling_team_id: secondBowlingTeamId,
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Swap teams for players
+        await fetchTeamPlayers(secondBattingTeamId, secondBowlingTeamId);
+        
+        setInnings(newInnings);
+        setStriker(null);
+        setNonStriker(null);
+        setCurrentBowler(null);
+        setBattingPlayerIds([]);
+        setCurrentOver(0);
+        setBallsInOver(0);
+        setCurrentOverDeliveries([]);
+        setShowSelectStriker(true);
+        
+        toast.success(declare ? 'Innings declared! Starting 2nd innings.' : 'All out! Starting 2nd innings.');
+      } else {
+        // Match completed
+        await supabase
+          .from('matches')
+          .update({ status: 'completed', ended_at: new Date().toISOString() })
+          .eq('id', matchId);
+        
+        toast.success('Match completed!');
+        navigate(`/match/${matchId}`);
+      }
+    } catch (error) {
+      console.error('Error ending innings:', error);
+      toast.error('Failed to end innings');
+    } finally {
+      setSavingScore(false);
+      setShowEndInningsDialog(false);
+      setShowLastBatsmanDialog(false);
+    }
+  };
+
   // Check if we need to show initial selection
   const needsPlayerSelection = !striker || !nonStriker || !currentBowler;
 
@@ -832,9 +918,13 @@ const Scoring: React.FC = () => {
                 <SheetTitle>Match Options</SheetTitle>
               </SheetHeader>
               <div className="mt-6 space-y-4">
-                <Button variant="outline" className="w-full justify-start" onClick={() => navigate(`/live/${matchId}`)}>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate(`/match/${matchId}`)}>
                   <FileText className="mr-2 h-4 w-4" />
                   View Full Scorecard
+                </Button>
+                <Button variant="outline" className="w-full justify-start text-destructive hover:text-destructive" onClick={() => setShowEndInningsDialog(true)}>
+                  <StopCircle className="mr-2 h-4 w-4" />
+                  End / Declare Innings
                 </Button>
                 <Button variant="outline" className="w-full justify-start" onClick={() => setShowMatchBreaksDialog(true)}>
                   <Clock className="mr-2 h-4 w-4" />
@@ -1147,6 +1237,83 @@ const Scoring: React.FC = () => {
         matchId={matchId || ''}
         allPlayers={[...battingTeamPlayers, ...bowlingTeamPlayers]}
       />
+
+      {/* End/Declare Innings Dialog */}
+      <Dialog open={showEndInningsDialog} onOpenChange={setShowEndInningsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              End Innings
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Are you sure you want to end the current innings?
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button 
+                onClick={() => handleEndInnings(true)} 
+                disabled={savingScore}
+                className="w-full"
+              >
+                Declare Innings
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => handleEndInnings(false)} 
+                disabled={savingScore}
+                className="w-full"
+              >
+                All Out / End Innings
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => setShowEndInningsDialog(false)}
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Last Batsman Dialog */}
+      <Dialog open={showLastBatsmanDialog} onOpenChange={setShowLastBatsmanDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Last Batsman Remaining
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Only one batsman is remaining. What would you like to do?
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button 
+                onClick={() => {
+                  setShowLastBatsmanDialog(false);
+                  setShowSelectNonStriker(true);
+                }} 
+                className="w-full"
+              >
+                Continue Scoring (Select Next Batsman)
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => handleEndInnings(false)} 
+                disabled={savingScore}
+                className="w-full"
+              >
+                Start Second Innings
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

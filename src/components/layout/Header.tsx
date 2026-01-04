@@ -55,8 +55,9 @@ const Header: React.FC = () => {
             </SheetTrigger>
             <SheetContent side="left" className="w-72">
               <SheetHeader>
-                <SheetTitle className="text-left font-display text-xl text-primary">
-                  CricScore
+                <SheetTitle className="text-left font-display text-xl">
+                  <span className="text-destructive">Cric</span>
+                  <span className="text-foreground">Score</span>
                 </SheetTitle>
               </SheetHeader>
               <nav className="mt-8 flex flex-col gap-2">
@@ -75,35 +76,28 @@ const Header: React.FC = () => {
             </SheetContent>
           </Sheet>
 
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary">
-              <span className="font-display text-sm font-bold text-primary-foreground">CS</span>
-            </div>
-            <span className="hidden font-display text-xl font-bold text-primary sm:inline-block">
-              CricScore
-            </span>
+          <Link to="/" className="flex items-center gap-1">
+            <span className="font-display text-xl font-bold text-destructive">Cric</span>
+            <span className="font-display text-xl font-bold text-foreground">Score</span>
           </Link>
         </div>
 
-        {/* Right side - Search and Profile */}
+        {/* Center - Search Bar */}
+        <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search players, teams, grounds..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10"
+            />
+          </div>
+        </form>
+
+        {/* Right side - Profile */}
         <div className="flex items-center gap-3">
-          <form onSubmit={handleSearch} className="hidden md:flex">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search players, teams..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-10"
-              />
-            </div>
-          </form>
-
-          <Button variant="ghost" size="icon" className="md:hidden">
-            <Search className="h-5 w-5" />
-          </Button>
-
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

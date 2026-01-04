@@ -78,11 +78,12 @@ const Index: React.FC = () => {
         {/* Hero Section for Non-authenticated users */}
         <div className="container mx-auto px-4 py-16">
           <div className="text-center max-w-3xl mx-auto animate-fade-in">
-            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-primary mb-6">
-              <span className="font-display text-3xl font-bold text-primary-foreground">CS</span>
+            <div className="mb-6">
+              <span className="font-display text-4xl font-bold text-destructive">Cric</span>
+              <span className="font-display text-4xl font-bold text-foreground">Score</span>
             </div>
-            <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
-              Welcome to <span className="text-primary">CricScore</span>
+            <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Welcome to <span className="text-destructive">Cric</span><span>Score</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8">
               Score matches, track your career, follow your favorite players, and connect with the cricket community.
