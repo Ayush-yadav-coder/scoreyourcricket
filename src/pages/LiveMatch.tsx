@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
@@ -134,6 +134,8 @@ interface PlayerPerformance {
 const LiveMatch = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'scorecard';
   const { user } = useAuth();
   const [match, setMatch] = useState<Match | null>(null);
   const [teams, setTeams] = useState<{ team1: Team | null; team2: Team | null }>({ team1: null, team2: null });
@@ -776,13 +778,13 @@ const LiveMatch = () => {
           </Badge>
         </div>
 
-        <Tabs defaultValue="scorecard" className="w-full">
+        <Tabs defaultValue={initialTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="scorecard">Scorecard</TabsTrigger>
             <TabsTrigger value="info">Info & Awards</TabsTrigger>
             <TabsTrigger value="analysis">Analysis</TabsTrigger>
-            <TabsTrigger value="live" disabled={!match.is_live_streaming}>
-              {match.is_live_streaming ? 'View Live' : 'No Stream'}
+            <TabsTrigger value="live">
+              {match.is_live_streaming ? '🔴 View Live' : 'Live Stream'}
             </TabsTrigger>
           </TabsList>
 
