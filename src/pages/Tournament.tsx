@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import TournamentBracket from '@/components/tournament/TournamentBracket';
 
 interface Tournament {
   id: string;
@@ -184,6 +185,7 @@ const Tournament: React.FC = () => {
         <Tabs defaultValue="matches">
           <TabsList className="w-full">
             <TabsTrigger value="matches" className="flex-1">Matches</TabsTrigger>
+            <TabsTrigger value="bracket" className="flex-1">Bracket</TabsTrigger>
             <TabsTrigger value="teams" className="flex-1">Teams</TabsTrigger>
             {groups.length > 0 && (
               <TabsTrigger value="groups" className="flex-1">Groups</TabsTrigger>
@@ -215,6 +217,10 @@ const Tournament: React.FC = () => {
                 />
               ))
             )}
+          </TabsContent>
+
+          <TabsContent value="bracket" className="mt-4">
+            <TournamentBracket tournamentId={tournamentId!} tournamentName={tournament.name} />
           </TabsContent>
 
           <TabsContent value="teams" className="mt-4">

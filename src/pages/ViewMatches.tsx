@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Play, Eye, Calendar, Filter } from 'lucide-react';
+import { ArrowLeft, Play, Eye, Calendar, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
 import { supabase } from '@/integrations/supabase/client';
+import MatchNotifications from '@/components/match/MatchNotifications';
 
 interface Match {
   id: string;
@@ -14,6 +16,7 @@ interface Match {
   match_type: string;
   created_by: string;
   created_at: string;
+  is_live_streaming: boolean;
   team1: { id: string; name: string };
   team2: { id: string; name: string };
 }
@@ -42,6 +45,7 @@ const ViewMatches: React.FC = () => {
         match_type,
         created_by,
         created_at,
+        is_live_streaming,
         team1:teams!matches_team1_id_fkey(id, name),
         team2:teams!matches_team2_id_fkey(id, name)
       `)
@@ -72,6 +76,7 @@ const ViewMatches: React.FC = () => {
 
   return (
     <MainLayout>
+      <MatchNotifications enabled={true} />
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
@@ -134,19 +139,37 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, isCreator }) => {
               <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
             )}
             <div>
-              <p className="font-semibold">
-                {match.team1?.name} vs {match.team2?.name}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold">
+                  {match.team1?.name} vs {match.team2?.name}
+                </p>
+                {match.is_live_streaming && match.status === 'live' && (
+                  <Badge variant="destructive" className="text-xs flex items-center gap-1">
+                    <Radio className="h-3 w-3" />
+                    LIVE
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground capitalize">
                 {match.match_type.replace('_', ' ')} • {match.status}
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             {match.status === 'live' && isCreator && (
               <Button size="sm" onClick={() => navigate(`/scoring/${match.id}`)}>
                 <Play className="h-4 w-4 mr-1" />
                 Continue
+              </Button>
+            )}
+            {match.is_live_streaming && match.status === 'live' && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => navigate(`/match/${match.id}?tab=live`)}
+              >
+                <Radio className="h-4 w-4 mr-1" />
+                View Live
               </Button>
             )}
             <Button
