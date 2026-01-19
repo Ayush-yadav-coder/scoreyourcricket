@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Search, User, LogOut, Trophy, Calendar, Play, ChevronDown, Medal, MessageCircle, List, Bell, GitCompare } from 'lucide-react';
+import { Menu, Search, User, LogOut, Trophy, Calendar, Play, ChevronDown, Medal, MessageCircle, List, Bell, GitCompare, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';

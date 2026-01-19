@@ -17,6 +17,7 @@ import OfficialsDialog from '@/components/scoring/OfficialsDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRealtimeScoring } from '@/hooks/useRealtimeScoring';
+import { checkAndAwardAchievements, checkCareerMilestones } from '@/lib/achievementsService';
 
 interface Player {
   id: string;
@@ -820,6 +821,40 @@ const Scoring: React.FC = () => {
     
     setSavingScore(true);
     try {
+      // Award achievements for all batters and bowlers in this innings
+      const { data: battingScores } = await supabase
+        .from('batting_scores')
+        .select('*')
+        .eq('innings_id', innings.id);
+
+      const { data: bowlingScores } = await supabase
+        .from('bowling_scores')
+        .select('*')
+        .eq('innings_id', innings.id);
+
+      // Award batting achievements
+      for (const bs of battingScores || []) {
+        if (bs.runs >= 50) {
+          await checkAndAwardAchievements(
+            bs.batsman_id,
+            matchId!,
+            { runs: bs.runs, balls_faced: bs.balls_faced, fours: bs.fours, sixes: bs.sixes }
+          );
+        }
+      }
+
+      // Award bowling achievements
+      for (const bs of bowlingScores || []) {
+        if (bs.wickets >= 5) {
+          await checkAndAwardAchievements(
+            bs.bowler_id,
+            matchId!,
+            undefined,
+            { wickets: bs.wickets, overs: Number(bs.overs), runs_conceded: bs.runs_conceded }
+          );
+        }
+      }
+
       // Mark current innings as completed
       await supabase
         .from('innings')
@@ -851,7 +886,6 @@ const Scoring: React.FC = () => {
         
         if (error) throw error;
         
-        // Swap teams for players
         await fetchTeamPlayers(secondBattingTeamId, secondBowlingTeamId);
         
         setInnings(newInnings);
@@ -866,13 +900,21 @@ const Scoring: React.FC = () => {
         
         toast.success(declare ? 'Innings declared! Starting 2nd innings.' : 'All out! Starting 2nd innings.');
       } else {
-        // Match completed
+        // Match completed - check career milestones
+        const allPlayerIds = new Set<string>();
+        battingScores?.forEach(bs => allPlayerIds.add(bs.batsman_id));
+        bowlingScores?.forEach(bs => allPlayerIds.add(bs.bowler_id));
+        
+        for (const playerId of allPlayerIds) {
+          await checkCareerMilestones(playerId);
+        }
+
         await supabase
           .from('matches')
           .update({ status: 'completed', ended_at: new Date().toISOString() })
           .eq('id', matchId);
         
-        toast.success('Match completed!');
+        toast.success('Match completed! Achievements awarded.');
         navigate(`/match/${matchId}`);
       }
     } catch (error) {

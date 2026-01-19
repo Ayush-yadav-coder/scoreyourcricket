@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Target, TrendingUp, Medal } from 'lucide-react';
+import { Trophy, Target, TrendingUp, Medal, Award, Star, Flame, Crown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,11 +27,22 @@ interface BowlerStats {
   average: number;
 }
 
+interface AchievementLeader {
+  player_id: string;
+  full_name: string;
+  avatar_url: string | null;
+  centuries: number;
+  half_centuries: number;
+  five_wickets: number;
+  total_achievements: number;
+}
+
 const Leaderboard: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [topBatsmen, setTopBatsmen] = useState<BatsmanStats[]>([]);
   const [topBowlers, setTopBowlers] = useState<BowlerStats[]>([]);
+  const [achievementLeaders, setAchievementLeaders] = useState<AchievementLeader[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -81,13 +93,11 @@ const Leaderboard: React.FC = () => {
         }
       });
 
-      // Calculate averages
       const batsmen = Array.from(batsmenMap.values()).map((b) => ({
         ...b,
         average: b.total_innings > 0 ? b.total_runs / b.total_innings : 0,
       }));
 
-      // Sort by total runs
       batsmen.sort((a, b) => b.total_runs - a.total_runs);
       setTopBatsmen(batsmen.slice(0, 20));
     }
@@ -129,16 +139,52 @@ const Leaderboard: React.FC = () => {
         }
       });
 
-      // Calculate economy and average
       const bowlers = Array.from(bowlersMap.values()).map((b) => ({
         ...b,
         economy: b.total_overs > 0 ? b.total_runs_conceded / b.total_overs : 0,
         average: b.total_wickets > 0 ? b.total_runs_conceded / b.total_wickets : 0,
       }));
 
-      // Sort by total wickets
       bowlers.sort((a, b) => b.total_wickets - a.total_wickets);
       setTopBowlers(bowlers.slice(0, 20));
+    }
+
+    // Fetch achievement leaders
+    const { data: achievementsData } = await supabase
+      .from('player_achievements')
+      .select(`
+        player_id,
+        achievement_type,
+        profiles!player_achievements_player_id_fkey(full_name, avatar_url)
+      `);
+
+    if (achievementsData) {
+      const achievementMap = new Map<string, AchievementLeader>();
+
+      achievementsData.forEach((a: any) => {
+        const existing = achievementMap.get(a.player_id);
+        
+        if (existing) {
+          existing.total_achievements++;
+          if (a.achievement_type === 'century') existing.centuries++;
+          if (a.achievement_type === 'half_century') existing.half_centuries++;
+          if (a.achievement_type === 'five_wickets') existing.five_wickets++;
+        } else {
+          achievementMap.set(a.player_id, {
+            player_id: a.player_id,
+            full_name: a.profiles?.full_name || 'Unknown',
+            avatar_url: a.profiles?.avatar_url,
+            centuries: a.achievement_type === 'century' ? 1 : 0,
+            half_centuries: a.achievement_type === 'half_century' ? 1 : 0,
+            five_wickets: a.achievement_type === 'five_wickets' ? 1 : 0,
+            total_achievements: 1,
+          });
+        }
+      });
+
+      const leaders = Array.from(achievementMap.values());
+      leaders.sort((a, b) => b.total_achievements - a.total_achievements);
+      setAchievementLeaders(leaders.slice(0, 20));
     }
 
     setLoading(false);
@@ -181,14 +227,18 @@ const Leaderboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="batting" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="batting" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
-              Top Batsmen
+              Batsmen
             </TabsTrigger>
             <TabsTrigger value="bowling" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Top Bowlers
+              Bowlers
+            </TabsTrigger>
+            <TabsTrigger value="achievements" className="flex items-center gap-2">
+              <Award className="h-4 w-4" />
+              Achievements
             </TabsTrigger>
           </TabsList>
 
@@ -292,6 +342,75 @@ const Leaderboard: React.FC = () => {
                         <p className="text-sm text-muted-foreground">
                           Avg: {bowler.average.toFixed(2)}
                         </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="achievements" className="mt-6">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : achievementLeaders.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Award className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground">No achievements yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {achievementLeaders.map((player, index) => (
+                  <Card
+                    key={player.player_id}
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => navigate(`/player/${player.player_id}`)}
+                  >
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-8">
+                          {index < 3 ? (
+                            <Medal className={`h-6 w-6 ${getMedalColor(index)}`} />
+                          ) : (
+                            <span className="text-lg font-bold text-muted-foreground">
+                              {index + 1}
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                          {player.full_name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-semibold">{player.full_name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {player.centuries > 0 && (
+                              <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                                <Crown className="h-3 w-3 mr-1" />
+                                {player.centuries} 100s
+                              </Badge>
+                            )}
+                            {player.half_centuries > 0 && (
+                              <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/30">
+                                <Star className="h-3 w-3 mr-1" />
+                                {player.half_centuries} 50s
+                              </Badge>
+                            )}
+                            {player.five_wickets > 0 && (
+                              <Badge variant="outline" className="text-xs bg-red-500/10 text-red-600 border-red-500/30">
+                                <Flame className="h-3 w-3 mr-1" />
+                                {player.five_wickets} 5W
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-primary">{player.total_achievements}</p>
+                        <p className="text-sm text-muted-foreground">achievements</p>
                       </div>
                     </CardContent>
                   </Card>
