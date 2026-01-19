@@ -17,10 +17,70 @@ interface Match {
   current_batting: string;
 }
 
+const themeStyles: Record<string, { bg: string; text: string; muted: string; border: string; accent: string }> = {
+  dark: {
+    bg: 'bg-gray-900',
+    text: 'text-white',
+    muted: 'text-gray-400',
+    border: 'border-gray-700',
+    accent: 'bg-red-500',
+  },
+  light: {
+    bg: 'bg-white',
+    text: 'text-gray-900',
+    muted: 'text-gray-500',
+    border: 'border-gray-200',
+    accent: 'bg-red-500',
+  },
+  ipl: {
+    bg: 'bg-[#1e3a5f]',
+    text: 'text-[#f7d046]',
+    muted: 'text-blue-200',
+    border: 'border-blue-400/30',
+    accent: 'bg-[#f7d046]',
+  },
+  bcci: {
+    bg: 'bg-[#0a4f9c]',
+    text: 'text-white',
+    muted: 'text-blue-200',
+    border: 'border-blue-400/30',
+    accent: 'bg-orange-500',
+  },
+  cricket: {
+    bg: 'bg-[#1b4d3e]',
+    text: 'text-white',
+    muted: 'text-green-200',
+    border: 'border-green-400/30',
+    accent: 'bg-yellow-500',
+  },
+  minimal: {
+    bg: 'bg-slate-50',
+    text: 'text-slate-900',
+    muted: 'text-slate-500',
+    border: 'border-slate-200',
+    accent: 'bg-slate-900',
+  },
+  neon: {
+    bg: 'bg-[#0a0a0a]',
+    text: 'text-[#39ff14]',
+    muted: 'text-green-400/70',
+    border: 'border-[#39ff14]/30',
+    accent: 'bg-[#39ff14]',
+  },
+  retro: {
+    bg: 'bg-[#2d1b69]',
+    text: 'text-[#ff6b6b]',
+    muted: 'text-pink-300',
+    border: 'border-pink-500/30',
+    accent: 'bg-[#ff6b6b]',
+  },
+};
+
 const EmbedTicker: React.FC = () => {
   const [searchParams] = useSearchParams();
   const matchId = searchParams.get('match');
   const theme = searchParams.get('theme') || 'dark';
+  const refreshInterval = parseInt(searchParams.get('refresh') || '30') * 1000;
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,15 +98,17 @@ const EmbedTicker: React.FC = () => {
         )
         .subscribe();
 
+      // Also set up polling as fallback
+      const pollInterval = setInterval(() => fetchMatch(matchId), refreshInterval);
+
       return () => {
         supabase.removeChannel(channel);
+        clearInterval(pollInterval);
       };
     }
-  }, [matchId]);
+  }, [matchId, refreshInterval]);
 
   const fetchMatch = async (id: string) => {
-    setLoading(true);
-
     const { data: matchData } = await supabase
       .from('matches')
       .select(`
@@ -89,33 +151,29 @@ const EmbedTicker: React.FC = () => {
     setLoading(false);
   };
 
-  const isDark = theme === 'dark';
-  const bgColor = isDark ? 'bg-gray-900' : 'bg-white';
-  const textColor = isDark ? 'text-white' : 'text-gray-900';
-  const mutedColor = isDark ? 'text-gray-400' : 'text-gray-500';
-  const borderColor = isDark ? 'border-gray-700' : 'border-gray-200';
+  const styles = themeStyles[theme] || themeStyles.dark;
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${bgColor} flex items-center justify-center`}>
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+      <div className={`min-h-screen ${styles.bg} flex items-center justify-center`}>
+        <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${styles.accent}`}></div>
       </div>
     );
   }
 
   if (!match) {
     return (
-      <div className={`min-h-screen ${bgColor} ${textColor} flex items-center justify-center`}>
+      <div className={`min-h-screen ${styles.bg} ${styles.text} flex items-center justify-center`}>
         <p>Match not found</p>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen ${bgColor} ${textColor} p-4`}>
-      <div className={`border ${borderColor} rounded-lg overflow-hidden`}>
+    <div className={`min-h-screen ${styles.bg} ${styles.text} p-4`}>
+      <div className={`border ${styles.border} rounded-lg overflow-hidden`}>
         {/* Header */}
-        <div className={`px-4 py-2 border-b ${borderColor} flex items-center justify-between`}>
+        <div className={`px-4 py-2 border-b ${styles.border} flex items-center justify-between`}>
           <div className="flex items-center gap-2">
             {match.status === 'live' && (
               <Circle className="w-3 h-3 fill-red-500 text-red-500 animate-pulse" />
@@ -124,7 +182,7 @@ const EmbedTicker: React.FC = () => {
               {match.status === 'live' ? 'LIVE' : match.status.toUpperCase()}
             </span>
           </div>
-          <span className={`text-xs ${mutedColor}`}>Powered by Cric Score</span>
+          <span className={`text-xs ${styles.muted}`}>Powered by Cric Score</span>
         </div>
 
         {/* Scores */}
@@ -133,34 +191,34 @@ const EmbedTicker: React.FC = () => {
             {/* Team 1 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center font-bold text-sm`}>
+                <div className={`w-8 h-8 rounded-full ${styles.border} border-2 flex items-center justify-center font-bold text-sm`}>
                   {match.team1_name.charAt(0)}
                 </div>
-                <span className="font-medium">{match.team1_name}</span>
+                <span className="font-medium truncate max-w-[120px]">{match.team1_name}</span>
                 {match.current_batting === match.team1_name && match.status === 'live' && (
-                  <span className="text-xs px-1.5 py-0.5 bg-red-500/20 text-red-500 rounded">BAT</span>
+                  <span className={`text-xs px-1.5 py-0.5 ${styles.accent} text-white rounded font-medium`}>BAT</span>
                 )}
               </div>
               <div className="text-right">
                 <span className="text-xl font-bold">{match.team1_score}/{match.team1_wickets}</span>
-                <span className={`text-sm ${mutedColor} ml-2`}>({match.team1_overs} ov)</span>
+                <span className={`text-sm ${styles.muted} ml-2`}>({match.team1_overs} ov)</span>
               </div>
             </div>
 
             {/* Team 2 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center font-bold text-sm`}>
+                <div className={`w-8 h-8 rounded-full ${styles.border} border-2 flex items-center justify-center font-bold text-sm`}>
                   {match.team2_name.charAt(0)}
                 </div>
-                <span className="font-medium">{match.team2_name}</span>
+                <span className="font-medium truncate max-w-[120px]">{match.team2_name}</span>
                 {match.current_batting === match.team2_name && match.status === 'live' && (
-                  <span className="text-xs px-1.5 py-0.5 bg-red-500/20 text-red-500 rounded">BAT</span>
+                  <span className={`text-xs px-1.5 py-0.5 ${styles.accent} text-white rounded font-medium`}>BAT</span>
                 )}
               </div>
               <div className="text-right">
                 <span className="text-xl font-bold">{match.team2_score}/{match.team2_wickets}</span>
-                <span className={`text-sm ${mutedColor} ml-2`}>({match.team2_overs} ov)</span>
+                <span className={`text-sm ${styles.muted} ml-2`}>({match.team2_overs} ov)</span>
               </div>
             </div>
           </div>
