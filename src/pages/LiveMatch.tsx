@@ -18,6 +18,8 @@ import OverByOverGraph from '@/components/match/OverByOverGraph';
 import DetailedScorecard from '@/components/match/DetailedScorecard';
 import HeadToHead from '@/components/match/HeadToHead';
 import ScorecardExport from '@/components/match/ScorecardExport';
+import AdvancedMatchStats from '@/components/match/AdvancedMatchStats';
+import MomentumGraph from '@/components/match/MomentumGraph';
 
 interface Delivery {
   id: string;
@@ -779,12 +781,13 @@ const LiveMatch = () => {
         </div>
 
         <Tabs defaultValue={initialTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="scorecard">Scorecard</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="info">Info & Awards</TabsTrigger>
             <TabsTrigger value="analysis">Analysis</TabsTrigger>
             <TabsTrigger value="live">
-              {match.is_live_streaming ? '🔴 View Live' : 'Live Stream'}
+              {match.is_live_streaming ? '🔴 Live' : 'Stream'}
             </TabsTrigger>
           </TabsList>
 
@@ -873,6 +876,91 @@ const LiveMatch = () => {
                 </ScrollArea>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Analytics Tab - Advanced Stats */}
+          <TabsContent value="analytics" className="space-y-6">
+            {currentInnings && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Advanced Match Stats */}
+                <div>
+                  <AdvancedMatchStats
+                    currentInnings={{
+                      total_runs: currentInnings.total_runs,
+                      total_wickets: currentInnings.total_wickets,
+                      total_overs: currentInnings.total_overs,
+                      is_completed: currentInnings.is_completed,
+                    }}
+                    targetScore={
+                      currentInnings.innings_number > 1 
+                        ? (allInnings[0]?.total_runs || 0) + 1 
+                        : undefined
+                    }
+                    deliveries={allDeliveries
+                      .filter(d => d.innings_id === currentInnings.id)
+                      .map(d => ({
+                        runs: d.runs,
+                        is_wicket: d.is_wicket,
+                        is_boundary: d.is_boundary,
+                        is_six: d.is_six,
+                        is_wide: d.is_wide,
+                        is_no_ball: d.is_no_ball,
+                        over_number: d.over_number,
+                        ball_number: d.ball_number,
+                      }))}
+                    matchOvers={match.overs || 20}
+                  />
+                </div>
+
+                {/* Momentum Graph */}
+                <div>
+                  <MomentumGraph
+                    deliveries={allDeliveries
+                      .filter(d => d.innings_id === currentInnings.id)
+                      .map(d => ({
+                        runs: d.runs,
+                        is_wicket: d.is_wicket,
+                        over_number: d.over_number,
+                        ball_number: d.ball_number,
+                      }))}
+                    team1Name={teams.team1?.name || 'Team 1'}
+                    team2Name={teams.team2?.name || 'Team 2'}
+                    innings1Deliveries={
+                      allInnings[0] 
+                        ? allDeliveries
+                            .filter(d => d.innings_id === allInnings[0].id)
+                            .map(d => ({
+                              runs: d.runs,
+                              is_wicket: d.is_wicket,
+                              over_number: d.over_number,
+                              ball_number: d.ball_number,
+                            }))
+                        : []
+                    }
+                    innings2Deliveries={
+                      allInnings[1] 
+                        ? allDeliveries
+                            .filter(d => d.innings_id === allInnings[1].id)
+                            .map(d => ({
+                              runs: d.runs,
+                              is_wicket: d.is_wicket,
+                              over_number: d.over_number,
+                              ball_number: d.ball_number,
+                            }))
+                        : []
+                    }
+                  />
+                </div>
+              </div>
+            )}
+
+            {!currentInnings && (
+              <Card className="bg-card border-border">
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  Analytics will be available once the match starts
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="info" className="space-y-6">

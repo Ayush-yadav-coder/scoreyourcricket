@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Search, User, LogOut, Trophy, Calendar, Play, ChevronDown, Medal, MessageCircle, List } from 'lucide-react';
+import { Menu, Search, User, LogOut, Trophy, Calendar, Play, ChevronDown, Medal, MessageCircle, List, Bell, GitCompare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -69,6 +69,8 @@ const Header: React.FC = () => {
     { icon: Trophy, label: 'Our Career', href: '/career' },
     { icon: Medal, label: 'Leaderboard', href: '/leaderboard' },
     { icon: MessageCircle, label: 'Messages', href: '/messages' },
+    { icon: Bell, label: 'Notification Settings', href: '/notification-settings' },
+    { icon: GitCompare, label: 'Compare Players', href: '/compare' },
     { icon: Calendar, label: 'View Matches', href: '/view-matches' },
     { icon: List, label: 'View Series', href: '/view-series' },
     { icon: Trophy, label: 'View Tournaments', href: '/view-tournaments' },
@@ -180,6 +182,10 @@ const Header: React.FC = () => {
                       {unreadCount}
                     </Badge>
                   )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/notification-settings')}>
+                  <Bell className="mr-2 h-4 w-4" />
+                  Notification Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive">

@@ -27,6 +27,7 @@ import EmbedTicker from "./pages/EmbedTicker";
 import ViewSeries from "./pages/ViewSeries";
 import Series from "./pages/Series";
 import CompareStats from "./pages/CompareStats";
+import NotificationSettings from "./pages/NotificationSettings";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/messages" element={<Messages />} />
             <Route path="/embed/ticker" element={<EmbedTicker />} />
             <Route path="/compare" element={<CompareStats />} />
+            <Route path="/notification-settings" element={<NotificationSettings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

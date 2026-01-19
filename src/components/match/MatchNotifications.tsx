@@ -8,11 +8,49 @@ interface MatchNotificationsProps {
   enabled?: boolean;
 }
 
+interface NotificationPreferences {
+  wickets: boolean;
+  boundaries: boolean;
+  sixes: boolean;
+  milestones: boolean;
+  matchStart: boolean;
+  matchEnd: boolean;
+  messages: boolean;
+  soundEnabled: boolean;
+  browserNotifications: boolean;
+}
+
+const defaultPreferences: NotificationPreferences = {
+  wickets: true,
+  boundaries: true,
+  sixes: true,
+  milestones: true,
+  matchStart: true,
+  matchEnd: true,
+  messages: true,
+  soundEnabled: true,
+  browserNotifications: true,
+};
+
+const getPreferences = (): NotificationPreferences => {
+  try {
+    const saved = localStorage.getItem('notificationPreferences');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to parse notification preferences:', e);
+  }
+  return defaultPreferences;
+};
+
 const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enabled = true }) => {
   const { user } = useAuth();
   const lastNotifiedRef = useRef<Map<string, number>>(new Map());
 
   const showNotification = useCallback((title: string, description: string, type: 'success' | 'error' | 'info') => {
+    const prefs = getPreferences();
+    
     // Debounce notifications - don't show same notification within 5 seconds
     const key = `${title}-${description}`;
     const now = Date.now();
@@ -32,11 +70,28 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
       toast.info(title, { description, duration: 5000 });
     }
 
-    // Play sound if supported
-    if ('Notification' in window && Notification.permission === 'granted') {
+    // Play sound if enabled
+    if (prefs.soundEnabled && 'Notification' in window && Notification.permission === 'granted') {
       try {
-        new Audio('/notification.mp3').play().catch(() => {});
+        const audio = new Audio('/notification.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(() => {});
       } catch {}
+    }
+
+    // Show browser notification if enabled and page is hidden
+    if (prefs.browserNotifications && 'Notification' in window && Notification.permission === 'granted') {
+      if (document.hidden || document.visibilityState === 'hidden') {
+        try {
+          const notification = new Notification(title, {
+            body: description,
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: key,
+          });
+          setTimeout(() => notification.close(), 10000);
+        } catch {}
+      }
     }
   }, []);
 
@@ -58,10 +113,11 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'matches', filter },
         async (payload) => {
+          const prefs = getPreferences();
           const match = payload.new as any;
           const oldMatch = payload.old as any;
           
-          if (match.status === 'live' && oldMatch?.status !== 'live') {
+          if (match.status === 'live' && oldMatch?.status !== 'live' && prefs.matchStart) {
             // Fetch team names
             const { data: teams } = await supabase
               .from('teams')
@@ -72,7 +128,7 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
             const team2 = teams?.find(t => t.id === match.team2_id)?.name || 'Team 2';
             
             showNotification('🔴 Match Started!', `${team1} vs ${team2} is now LIVE`, 'info');
-          } else if (match.status === 'completed' && oldMatch?.status === 'live') {
+          } else if (match.status === 'completed' && oldMatch?.status === 'live' && prefs.matchEnd) {
             showNotification('🏆 Match Completed!', 'The match has ended. Check the scorecard!', 'success');
           }
         }
@@ -87,34 +143,37 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'innings', filter: inningsFilter },
         (payload) => {
+          const prefs = getPreferences();
           const innings = payload.new as any;
           const oldInnings = payload.old as any;
           
           // Wicket notification
-          if (innings.total_wickets > (oldInnings?.total_wickets || 0)) {
+          if (innings.total_wickets > (oldInnings?.total_wickets || 0) && prefs.wickets) {
             showNotification('🏏 WICKET!', `${innings.total_runs}/${innings.total_wickets}`, 'error');
           }
           
           // Milestone notifications
-          const newMilestone = Math.floor(innings.total_runs / 50) * 50;
-          const oldMilestone = Math.floor((oldInnings?.total_runs || 0) / 50) * 50;
-          
-          if (newMilestone > oldMilestone && newMilestone >= 50) {
-            showNotification(
-              `🎉 ${newMilestone} RUNS!`,
-              `Team reaches ${newMilestone} runs!`,
-              'success'
-            );
-          }
-          
-          // Century milestone
-          if (innings.total_runs >= 100 && (oldInnings?.total_runs || 0) < 100) {
-            showNotification('💯 CENTURY!', 'Team crosses 100 runs!', 'success');
-          }
-          
-          // 200 milestone
-          if (innings.total_runs >= 200 && (oldInnings?.total_runs || 0) < 200) {
-            showNotification('🔥 200 RUNS!', 'Team crosses 200 runs!', 'success');
+          if (prefs.milestones) {
+            const newMilestone = Math.floor(innings.total_runs / 50) * 50;
+            const oldMilestone = Math.floor((oldInnings?.total_runs || 0) / 50) * 50;
+            
+            if (newMilestone > oldMilestone && newMilestone >= 50) {
+              showNotification(
+                `🎉 ${newMilestone} RUNS!`,
+                `Team reaches ${newMilestone} runs!`,
+                'success'
+              );
+            }
+            
+            // Century milestone
+            if (innings.total_runs >= 100 && (oldInnings?.total_runs || 0) < 100) {
+              showNotification('💯 CENTURY!', 'Team crosses 100 runs!', 'success');
+            }
+            
+            // 200 milestone
+            if (innings.total_runs >= 200 && (oldInnings?.total_runs || 0) < 200) {
+              showNotification('🔥 200 RUNS!', 'Team crosses 200 runs!', 'success');
+            }
           }
         }
       )
@@ -127,13 +186,14 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'deliveries' },
         (payload) => {
+          const prefs = getPreferences();
           const delivery = payload.new as any;
           
-          if (delivery.is_wicket) {
+          if (delivery.is_wicket && prefs.wickets) {
             showNotification('🏏 WICKET!', `${delivery.dismissal_type || 'Out'}!`, 'error');
-          } else if (delivery.is_six) {
+          } else if (delivery.is_six && prefs.sixes) {
             showNotification('💥 SIX!', 'Maximum! Ball sails over the boundary!', 'success');
-          } else if (delivery.is_boundary) {
+          } else if (delivery.is_boundary && prefs.boundaries) {
             showNotification('🏏 FOUR!', 'Shot to the boundary!', 'success');
           }
         }
