@@ -18,7 +18,8 @@ import {
   Trophy,
   Target,
   TrendingUp,
-  MessageCircle
+  MessageCircle,
+  GitCompare
 } from 'lucide-react';
 
 interface PlayerProfile {
@@ -312,6 +313,13 @@ const PlayerProfile: React.FC = () => {
                     >
                       <MessageCircle className="h-4 w-4 mr-2" />
                       Message
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => navigate(`/compare?player1=${playerId}`)}
+                    >
+                      <GitCompare className="h-4 w-4 mr-2" />
+                      Compare
                     </Button>
                   </div>
                 )}
