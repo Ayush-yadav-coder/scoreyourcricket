@@ -28,6 +28,8 @@ import ViewSeries from "./pages/ViewSeries";
 import Series from "./pages/Series";
 import CompareStats from "./pages/CompareStats";
 import NotificationSettings from "./pages/NotificationSettings";
+import Grounds from "./pages/Grounds";
+import GroundDetails from "./pages/GroundDetails";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +64,8 @@ const App = () => (
             <Route path="/embed/ticker" element={<EmbedTicker />} />
             <Route path="/compare" element={<CompareStats />} />
             <Route path="/notification-settings" element={<NotificationSettings />} />
+            <Route path="/grounds" element={<Grounds />} />
+            <Route path="/ground/:groundId" element={<GroundDetails />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
