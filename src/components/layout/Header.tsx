@@ -68,6 +68,7 @@ const Header: React.FC = () => {
     { icon: User, label: 'View Profile', href: '/profile' },
     { icon: Trophy, label: 'Our Career', href: '/career' },
     { icon: Medal, label: 'Leaderboard', href: '/leaderboard' },
+    { icon: MapPin, label: 'Cricket Grounds', href: '/grounds' },
     { icon: MessageCircle, label: 'Messages', href: '/messages' },
     { icon: Bell, label: 'Notification Settings', href: '/notification-settings' },
     { icon: GitCompare, label: 'Compare Players', href: '/compare' },

@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { MapPin, Search, Plus, Trophy, Loader2, ChevronRight } from 'lucide-react';
+import { MapPin, Search, Plus, Trophy, Loader2, ChevronRight, GitCompare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-
+import GroundComparison from '@/components/match/GroundComparison';
 interface Ground {
   id: string;
   name: string;
@@ -127,7 +128,7 @@ const Grounds: React.FC = () => {
             </div>
             <div>
               <h1 className="font-display text-2xl md:text-3xl font-bold">Cricket Grounds</h1>
-              <p className="text-muted-foreground">Explore venues and their statistics</p>
+              <p className="text-muted-foreground">Explore venues, compare conditions & statistics</p>
             </div>
           </div>
 
@@ -189,15 +190,29 @@ const Grounds: React.FC = () => {
           )}
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search grounds..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        {/* Tabs for Browse and Compare */}
+        <Tabs defaultValue="browse" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="browse" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Browse Grounds
+            </TabsTrigger>
+            <TabsTrigger value="compare" className="flex items-center gap-2">
+              <GitCompare className="h-4 w-4" />
+              Head-to-Head
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="browse" className="space-y-4 mt-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search grounds..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
         </div>
 
         {/* Grounds List */}
@@ -250,6 +265,12 @@ const Grounds: React.FC = () => {
             ))}
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="compare" className="mt-4">
+            <GroundComparison />
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
