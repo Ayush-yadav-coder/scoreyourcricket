@@ -19,8 +19,10 @@ import {
   Target,
   TrendingUp,
   MessageCircle,
-  GitCompare
+  GitCompare,
+  Award
 } from 'lucide-react';
+import PlayerAchievements from '@/components/player/PlayerAchievements';
 
 interface PlayerProfile {
   id: string;
@@ -330,9 +332,13 @@ const PlayerProfile: React.FC = () => {
 
         {/* Stats */}
         <Tabs defaultValue="batting" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="batting">Batting</TabsTrigger>
             <TabsTrigger value="bowling">Bowling</TabsTrigger>
+            <TabsTrigger value="achievements">
+              <Award className="h-4 w-4 mr-1" />
+              Achievements
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="batting">
@@ -375,6 +381,10 @@ const PlayerProfile: React.FC = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="achievements">
+            {playerId && <PlayerAchievements playerId={playerId} />}
           </TabsContent>
         </Tabs>
       </div>

@@ -575,6 +575,60 @@ export type Database = {
         }
         Relationships: []
       }
+      player_achievements: {
+        Row: {
+          achieved_at: string
+          achievement_description: string | null
+          achievement_name: string
+          achievement_type: string
+          created_at: string
+          icon_name: string | null
+          id: string
+          match_id: string | null
+          player_id: string
+          value: number | null
+        }
+        Insert: {
+          achieved_at?: string
+          achievement_description?: string | null
+          achievement_name: string
+          achievement_type: string
+          created_at?: string
+          icon_name?: string | null
+          id?: string
+          match_id?: string | null
+          player_id: string
+          value?: number | null
+        }
+        Update: {
+          achieved_at?: string
+          achievement_description?: string | null
+          achievement_name?: string
+          achievement_type?: string
+          created_at?: string
+          icon_name?: string | null
+          id?: string
+          match_id?: string | null
+          player_id?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_achievements_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_achievements_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

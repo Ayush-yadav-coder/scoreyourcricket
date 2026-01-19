@@ -20,6 +20,8 @@ import HeadToHead from '@/components/match/HeadToHead';
 import ScorecardExport from '@/components/match/ScorecardExport';
 import AdvancedMatchStats from '@/components/match/AdvancedMatchStats';
 import MomentumGraph from '@/components/match/MomentumGraph';
+import MatchPrediction from '@/components/match/MatchPrediction';
+import EmbedCodeGenerator from '@/components/embed/EmbedCodeGenerator';
 
 interface Delivery {
   id: string;
@@ -1151,6 +1153,26 @@ const LiveMatch = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Win Prediction */}
+            {currentInnings && match && (
+              <MatchPrediction
+                team1Name={teams.team1?.name || 'Team 1'}
+                team2Name={teams.team2?.name || 'Team 2'}
+                team1Score={allInnings.find(i => i.batting_team_id === match.team1_id)?.total_runs || 0}
+                team1Wickets={allInnings.find(i => i.batting_team_id === match.team1_id)?.total_wickets || 0}
+                team1Overs={Number(allInnings.find(i => i.batting_team_id === match.team1_id)?.total_overs || 0)}
+                team2Score={allInnings.find(i => i.batting_team_id === match.team2_id)?.total_runs || 0}
+                team2Wickets={allInnings.find(i => i.batting_team_id === match.team2_id)?.total_wickets || 0}
+                team2Overs={Number(allInnings.find(i => i.batting_team_id === match.team2_id)?.total_overs || 0)}
+                totalOvers={match.overs || 20}
+                isFirstInnings={currentInnings.innings_number === 1}
+                target={currentInnings.innings_number > 1 ? (allInnings[0]?.total_runs || 0) + 1 : undefined}
+              />
+            )}
+
+            {/* Embed Code Generator */}
+            {matchId && <EmbedCodeGenerator matchId={matchId} />}
           </TabsContent>
         </Tabs>
       </div>
