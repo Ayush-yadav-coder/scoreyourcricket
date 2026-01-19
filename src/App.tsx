@@ -26,6 +26,7 @@ import Messages from "./pages/Messages";
 import EmbedTicker from "./pages/EmbedTicker";
 import ViewSeries from "./pages/ViewSeries";
 import Series from "./pages/Series";
+import CompareStats from "./pages/CompareStats";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/series/:seriesId" element={<Series />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/embed/ticker" element={<EmbedTicker />} />
+            <Route path="/compare" element={<CompareStats />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

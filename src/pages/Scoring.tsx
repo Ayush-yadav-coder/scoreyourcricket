@@ -1210,10 +1210,33 @@ const Scoring: React.FC = () => {
           }),
           runRate: innings?.total_overs > 0 ? Number((innings.total_runs / innings.total_overs).toFixed(2)) : 0,
         }}
-        onStartStream={(withTicker, tickerStyle) => {
-          setIsStreaming(true);
-          setStreamTickerStyle(tickerStyle);
-          toast.success(withTicker ? `Started streaming with ${tickerStyle} ticker!` : 'Started streaming without ticker!');
+        onStartStream={async (withTicker, tickerStyle) => {
+          try {
+            // Update match in database to mark as streaming
+            const { error } = await supabase
+              .from('matches')
+              .update({ is_live_streaming: true })
+              .eq('id', matchId);
+            
+            if (error) {
+              console.error('Failed to update streaming status:', error);
+              toast.error('Failed to start streaming');
+              return;
+            }
+            
+            setIsStreaming(true);
+            setStreamTickerStyle(tickerStyle);
+            
+            // Update match state locally
+            if (match) {
+              setMatch({ ...match, is_live_streaming: true });
+            }
+            
+            toast.success(withTicker ? `Live streaming started with ${tickerStyle} ticker!` : 'Live streaming started!');
+          } catch (err) {
+            console.error('Stream start error:', err);
+            toast.error('Failed to start streaming');
+          }
         }}
       />
 
