@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Search, User, LogOut, Trophy, Calendar, Play, ChevronDown, Medal, MessageCircle, List, Bell, GitCompare, MapPin, Sparkles } from 'lucide-react';
+import { Menu, Search, User, LogOut, Trophy, Calendar, Play, ChevronDown, Medal, MessageCircle, List, Bell, GitCompare, MapPin, Sparkles, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -70,6 +70,7 @@ const Header: React.FC = () => {
     { icon: Medal, label: 'Leaderboard', href: '/leaderboard' },
     { icon: Sparkles, label: 'Match Highlights', href: '/highlights' },
     { icon: MapPin, label: 'Cricket Grounds', href: '/grounds' },
+    { icon: Users, label: 'Teams', href: '/search?type=teams' },
     { icon: MessageCircle, label: 'Messages', href: '/messages' },
     { icon: Bell, label: 'Notification Settings', href: '/notification-settings' },
     { icon: GitCompare, label: 'Compare Players', href: '/compare' },

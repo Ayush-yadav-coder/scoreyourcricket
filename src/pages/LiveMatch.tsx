@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Circle, Trophy, Target, Zap, Info, Download, BarChart2 } from 'lucide-react';
+import { Circle, Trophy, Target, Zap, Info, Download, BarChart2, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WagonWheel from '@/components/match/WagonWheel';
 import FallOfWickets from '@/components/match/FallOfWickets';
@@ -21,9 +21,10 @@ import HeadToHead from '@/components/match/HeadToHead';
 import ScorecardExport from '@/components/match/ScorecardExport';
 import AdvancedMatchStats from '@/components/match/AdvancedMatchStats';
 import MomentumGraph from '@/components/match/MomentumGraph';
-import MatchPrediction from '@/components/match/MatchPrediction';
 import EmbedCodeGenerator from '@/components/embed/EmbedCodeGenerator';
 import EnhancedRunRateGraph from '@/components/match/EnhancedRunRateGraph';
+import MatchMVP from '@/components/match/MatchMVP';
+import MatchPrediction from '@/components/match/MatchPrediction';
 
 interface Delivery {
   id: string;
@@ -1034,6 +1035,29 @@ const LiveMatch = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Match MVP */}
+            {matchId && (
+              <MatchMVP
+                matchId={matchId}
+                battingScores={battingScores.map(bs => ({
+                  batsman_id: bs.batsman_id,
+                  runs: bs.runs,
+                  balls_faced: bs.balls_faced,
+                  fours: bs.fours,
+                  sixes: bs.sixes,
+                }))}
+                bowlingScores={bowlingScores.map(bs => ({
+                  bowler_id: bs.bowler_id,
+                  wickets: bs.wickets,
+                  runs_conceded: bs.runs_conceded,
+                  overs: bs.overs,
+                }))}
+                playerNames={Object.fromEntries(
+                  Array.from(profiles.entries()).map(([id, p]) => [id, p.full_name])
+                )}
+              />
+            )}
 
             {/* Awards Section - Only for completed matches */}
             <MatchAwards
