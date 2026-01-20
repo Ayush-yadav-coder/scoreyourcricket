@@ -21,10 +21,12 @@ import {
   MessageCircle,
   GitCompare,
   Award,
-  Activity
+  Activity,
+  BarChart2
 } from 'lucide-react';
 import PlayerAchievements from '@/components/player/PlayerAchievements';
 import PlayerFormTracker from '@/components/player/PlayerFormTracker';
+import SeasonStats from '@/components/player/SeasonStats';
 
 interface PlayerProfile {
   id: string;
@@ -334,9 +336,13 @@ const PlayerProfile: React.FC = () => {
 
         {/* Stats */}
         <Tabs defaultValue="batting" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-4">
+          <TabsList className="grid w-full grid-cols-5 mb-4">
             <TabsTrigger value="batting">Batting</TabsTrigger>
             <TabsTrigger value="bowling">Bowling</TabsTrigger>
+            <TabsTrigger value="seasons">
+              <BarChart2 className="h-4 w-4 mr-1" />
+              Seasons
+            </TabsTrigger>
             <TabsTrigger value="form">
               <Activity className="h-4 w-4 mr-1" />
               Form
@@ -386,6 +392,12 @@ const PlayerProfile: React.FC = () => {
                   No bowling records yet
                 </CardContent>
               </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="seasons">
+            {playerId && player && (
+              <SeasonStats playerId={playerId} playerName={player.full_name} />
             )}
           </TabsContent>
 

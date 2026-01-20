@@ -32,6 +32,7 @@ import NotificationSettings from "./pages/NotificationSettings";
 import Grounds from "./pages/Grounds";
 import GroundDetails from "./pages/GroundDetails";
 import Highlights from "./pages/Highlights";
+import TeamProfile from "./pages/TeamProfile";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/grounds" element={<Grounds />} />
             <Route path="/ground/:groundId" element={<GroundDetails />} />
             <Route path="/highlights" element={<Highlights />} />
+            <Route path="/team/:teamId" element={<TeamProfile />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
