@@ -9,7 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Circle, Trophy, Target, Zap, Info, Download } from 'lucide-react';
+import { Circle, Trophy, Target, Zap, Info, Download, BarChart2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import WagonWheel from '@/components/match/WagonWheel';
 import FallOfWickets from '@/components/match/FallOfWickets';
 import MatchAwards from '@/components/match/MatchAwards';
@@ -22,6 +23,7 @@ import AdvancedMatchStats from '@/components/match/AdvancedMatchStats';
 import MomentumGraph from '@/components/match/MomentumGraph';
 import MatchPrediction from '@/components/match/MatchPrediction';
 import EmbedCodeGenerator from '@/components/embed/EmbedCodeGenerator';
+import EnhancedRunRateGraph from '@/components/match/EnhancedRunRateGraph';
 
 interface Delivery {
   id: string;
@@ -882,78 +884,109 @@ const LiveMatch = () => {
 
           {/* Analytics Tab - Advanced Stats */}
           <TabsContent value="analytics" className="space-y-6">
-            {currentInnings && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Advanced Match Stats */}
-                <div>
-                  <AdvancedMatchStats
-                    currentInnings={{
-                      total_runs: currentInnings.total_runs,
-                      total_wickets: currentInnings.total_wickets,
-                      total_overs: currentInnings.total_overs,
-                      is_completed: currentInnings.is_completed,
-                    }}
-                    targetScore={
-                      currentInnings.innings_number > 1 
-                        ? (allInnings[0]?.total_runs || 0) + 1 
-                        : undefined
-                    }
-                    deliveries={allDeliveries
-                      .filter(d => d.innings_id === currentInnings.id)
-                      .map(d => ({
-                        runs: d.runs,
-                        is_wicket: d.is_wicket,
-                        is_boundary: d.is_boundary,
-                        is_six: d.is_six,
-                        is_wide: d.is_wide,
-                        is_no_ball: d.is_no_ball,
-                        over_number: d.over_number,
-                        ball_number: d.ball_number,
-                      }))}
-                    matchOvers={match.overs || 20}
-                  />
-                </div>
+            {/* Link to Full Analytics Page */}
+            <div className="flex justify-end">
+              <Button onClick={() => navigate(`/match/${matchId}/analytics`)} variant="outline">
+                <BarChart2 className="h-4 w-4 mr-2" />
+                View Full Analytics
+              </Button>
+            </div>
 
-                {/* Momentum Graph */}
-                <div>
-                  <MomentumGraph
-                    deliveries={allDeliveries
-                      .filter(d => d.innings_id === currentInnings.id)
-                      .map(d => ({
-                        runs: d.runs,
-                        is_wicket: d.is_wicket,
-                        over_number: d.over_number,
-                        ball_number: d.ball_number,
-                      }))}
-                    team1Name={teams.team1?.name || 'Team 1'}
-                    team2Name={teams.team2?.name || 'Team 2'}
-                    innings1Deliveries={
-                      allInnings[0] 
-                        ? allDeliveries
-                            .filter(d => d.innings_id === allInnings[0].id)
-                            .map(d => ({
-                              runs: d.runs,
-                              is_wicket: d.is_wicket,
-                              over_number: d.over_number,
-                              ball_number: d.ball_number,
-                            }))
-                        : []
-                    }
-                    innings2Deliveries={
-                      allInnings[1] 
-                        ? allDeliveries
-                            .filter(d => d.innings_id === allInnings[1].id)
-                            .map(d => ({
-                              runs: d.runs,
-                              is_wicket: d.is_wicket,
-                              over_number: d.over_number,
-                              ball_number: d.ball_number,
-                            }))
-                        : []
-                    }
-                  />
+            {currentInnings && (
+              <>
+                {/* Enhanced Run Rate Graph */}
+                <EnhancedRunRateGraph
+                  deliveries={allDeliveries
+                    .filter(d => d.innings_id === currentInnings.id)
+                    .map(d => ({
+                      over_number: d.over_number,
+                      ball_number: d.ball_number,
+                      runs: d.runs,
+                      is_wicket: d.is_wicket,
+                      is_boundary: d.is_boundary,
+                      is_six: d.is_six,
+                    }))}
+                  teamName={getBattingTeamName()}
+                  targetScore={
+                    currentInnings.innings_number > 1 
+                      ? (allInnings[0]?.total_runs || 0) + 1 
+                      : undefined
+                  }
+                  totalOvers={match.overs || 20}
+                />
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Advanced Match Stats */}
+                  <div>
+                    <AdvancedMatchStats
+                      currentInnings={{
+                        total_runs: currentInnings.total_runs,
+                        total_wickets: currentInnings.total_wickets,
+                        total_overs: currentInnings.total_overs,
+                        is_completed: currentInnings.is_completed,
+                      }}
+                      targetScore={
+                        currentInnings.innings_number > 1 
+                          ? (allInnings[0]?.total_runs || 0) + 1 
+                          : undefined
+                      }
+                      deliveries={allDeliveries
+                        .filter(d => d.innings_id === currentInnings.id)
+                        .map(d => ({
+                          runs: d.runs,
+                          is_wicket: d.is_wicket,
+                          is_boundary: d.is_boundary,
+                          is_six: d.is_six,
+                          is_wide: d.is_wide,
+                          is_no_ball: d.is_no_ball,
+                          over_number: d.over_number,
+                          ball_number: d.ball_number,
+                        }))}
+                      matchOvers={match.overs || 20}
+                    />
+                  </div>
+
+                  {/* Momentum Graph */}
+                  <div>
+                    <MomentumGraph
+                      deliveries={allDeliveries
+                        .filter(d => d.innings_id === currentInnings.id)
+                        .map(d => ({
+                          runs: d.runs,
+                          is_wicket: d.is_wicket,
+                          over_number: d.over_number,
+                          ball_number: d.ball_number,
+                        }))}
+                      team1Name={teams.team1?.name || 'Team 1'}
+                      team2Name={teams.team2?.name || 'Team 2'}
+                      innings1Deliveries={
+                        allInnings[0] 
+                          ? allDeliveries
+                              .filter(d => d.innings_id === allInnings[0].id)
+                              .map(d => ({
+                                runs: d.runs,
+                                is_wicket: d.is_wicket,
+                                over_number: d.over_number,
+                                ball_number: d.ball_number,
+                              }))
+                          : []
+                      }
+                      innings2Deliveries={
+                        allInnings[1] 
+                          ? allDeliveries
+                              .filter(d => d.innings_id === allInnings[1].id)
+                              .map(d => ({
+                                runs: d.runs,
+                                is_wicket: d.is_wicket,
+                                over_number: d.over_number,
+                                ball_number: d.ball_number,
+                              }))
+                          : []
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {!currentInnings && (
