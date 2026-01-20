@@ -16,6 +16,7 @@ import PlayerProfile from "./pages/PlayerProfile";
 import Career from "./pages/Career";
 import Leaderboard from "./pages/Leaderboard";
 import LiveMatch from "./pages/LiveMatch";
+import MatchAnalytics from "./pages/MatchAnalytics";
 import NotFound from "./pages/NotFound";
 import NewTournament from "./pages/NewTournament";
 import NewSeries from "./pages/NewSeries";
@@ -53,6 +54,7 @@ const App = () => (
             <Route path="/new-match" element={<NewMatch />} />
             <Route path="/scoring/:matchId" element={<Scoring />} />
             <Route path="/match/:matchId" element={<LiveMatch />} />
+            <Route path="/match/:matchId/analytics" element={<MatchAnalytics />} />
             <Route path="/new-tournament" element={<NewTournament />} />
             <Route path="/new-series" element={<NewSeries />} />
             <Route path="/tournament/:tournamentId" element={<Tournament />} />

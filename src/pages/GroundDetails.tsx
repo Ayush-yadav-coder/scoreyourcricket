@@ -16,7 +16,8 @@ import {
   BarChart3,
   Users,
   Calendar,
-  Loader2
+  Loader2,
+  CloudSun
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { 
@@ -31,6 +32,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import WeatherPitchTracker from '@/components/ground/WeatherPitchTracker';
 
 interface Ground {
   id: string;
@@ -299,9 +301,13 @@ const GroundDetails: React.FC = () => {
 
         {stats && stats.totalMatches > 0 ? (
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="scores">Score Analysis</TabsTrigger>
+              <TabsTrigger value="conditions" className="flex items-center gap-1">
+                <CloudSun className="h-3 w-3" />
+                Conditions
+              </TabsTrigger>
               <TabsTrigger value="matches">Recent Matches</TabsTrigger>
             </TabsList>
 
@@ -450,6 +456,16 @@ const GroundDetails: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Conditions Tab - Weather and Pitch Tracker */}
+            <TabsContent value="conditions" className="space-y-4 mt-4">
+              {groundId && (
+                <WeatherPitchTracker 
+                  groundId={groundId} 
+                  groundName={ground.name}
+                />
+              )}
             </TabsContent>
 
             <TabsContent value="matches" className="space-y-4 mt-4">
