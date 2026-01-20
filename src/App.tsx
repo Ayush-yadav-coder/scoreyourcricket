@@ -31,6 +31,7 @@ import CompareStats from "./pages/CompareStats";
 import NotificationSettings from "./pages/NotificationSettings";
 import Grounds from "./pages/Grounds";
 import GroundDetails from "./pages/GroundDetails";
+import Highlights from "./pages/Highlights";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => (
             <Route path="/notification-settings" element={<NotificationSettings />} />
             <Route path="/grounds" element={<Grounds />} />
             <Route path="/ground/:groundId" element={<GroundDetails />} />
+            <Route path="/highlights" element={<Highlights />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

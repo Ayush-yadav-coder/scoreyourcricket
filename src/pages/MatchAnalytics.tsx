@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { ArrowLeft, BarChart2, TrendingUp, Target, Zap, Users, Activity } from 'lucide-react';
+import { ArrowLeft, BarChart2, TrendingUp, Target, Zap, Users, Activity, Trophy, MessageCircle } from 'lucide-react';
 
 import EnhancedRunRateGraph from '@/components/match/EnhancedRunRateGraph';
 import MomentumGraph from '@/components/match/MomentumGraph';
@@ -20,6 +20,8 @@ import WagonWheel from '@/components/match/WagonWheel';
 import BowlerComparison from '@/components/match/BowlerComparison';
 import MatchTimeline from '@/components/match/MatchTimeline';
 import MatchPrediction from '@/components/match/MatchPrediction';
+import MatchHighlightsReel from '@/components/match/MatchHighlightsReel';
+import LiveCommentary from '@/components/match/LiveCommentary';
 
 interface Delivery {
   id: string;
@@ -526,10 +528,18 @@ const MatchAnalytics: React.FC = () => {
         )}
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview" className="gap-1">
               <Activity className="h-4 w-4" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="highlights" className="gap-1">
+              <Trophy className="h-4 w-4" />
+              Highlights
+            </TabsTrigger>
+            <TabsTrigger value="commentary" className="gap-1">
+              <MessageCircle className="h-4 w-4" />
+              Commentary
             </TabsTrigger>
             <TabsTrigger value="runrate" className="gap-1">
               <TrendingUp className="h-4 w-4" />
@@ -602,6 +612,65 @@ const MatchAnalytics: React.FC = () => {
             <MatchTimeline
               events={generateTimelineEvents()}
               teamName={getBattingTeamName(selectedInnings) || undefined}
+            />
+          </TabsContent>
+
+          {/* Highlights Tab */}
+          <TabsContent value="highlights" className="space-y-6 mt-6">
+            <MatchHighlightsReel
+              matchId={matchId || ''}
+              team1Name={teams.team1?.name || 'Team 1'}
+              team2Name={teams.team2?.name || 'Team 2'}
+              deliveries={allDeliveries.map(d => ({
+                over_number: d.over_number,
+                ball_number: d.ball_number,
+                runs: d.runs,
+                is_wicket: d.is_wicket,
+                is_six: d.is_six,
+                is_boundary: d.is_boundary,
+                dismissal_type: d.dismissal_type,
+                batsman_id: d.batsman_id,
+                bowler_id: d.bowler_id,
+                created_at: d.created_at,
+              }))}
+              battingScores={battingScores.map(b => ({
+                batsman_id: b.batsman_id,
+                runs: b.runs,
+                balls_faced: b.balls_faced,
+              }))}
+              playerNames={Object.fromEntries(
+                Array.from(profiles.entries()).map(([id, p]) => [id, p.full_name])
+              )}
+            />
+          </TabsContent>
+
+          {/* Commentary Tab */}
+          <TabsContent value="commentary" className="space-y-6 mt-6">
+            <LiveCommentary
+              deliveries={inningsDeliveries.map(d => ({
+                over_number: d.over_number,
+                ball_number: d.ball_number,
+                runs: d.runs,
+                is_wicket: d.is_wicket,
+                is_six: d.is_six,
+                is_boundary: d.is_boundary,
+                is_wide: d.is_wide,
+                is_no_ball: d.is_no_ball,
+                is_bye: false,
+                is_leg_bye: false,
+                dismissal_type: d.dismissal_type,
+                created_at: d.created_at,
+              }))}
+              playerNames={Object.fromEntries(
+                Array.from(profiles.entries()).map(([id, p]) => [id, p.full_name])
+              )}
+              batsmanId={battingScores.find(b => !b.is_out)?.batsman_id || ''}
+              bowlerId={inningsDeliveries[inningsDeliveries.length - 1]?.bowler_id || ''}
+              currentScore={{
+                runs: currentInnings?.total_runs || 0,
+                wickets: currentInnings?.total_wickets || 0,
+                overs: currentInnings?.total_overs || 0,
+              }}
             />
           </TabsContent>
 

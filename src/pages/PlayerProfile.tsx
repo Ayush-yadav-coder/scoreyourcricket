@@ -20,9 +20,11 @@ import {
   TrendingUp,
   MessageCircle,
   GitCompare,
-  Award
+  Award,
+  Activity
 } from 'lucide-react';
 import PlayerAchievements from '@/components/player/PlayerAchievements';
+import PlayerFormTracker from '@/components/player/PlayerFormTracker';
 
 interface PlayerProfile {
   id: string;
@@ -332,9 +334,13 @@ const PlayerProfile: React.FC = () => {
 
         {/* Stats */}
         <Tabs defaultValue="batting" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-4 mb-4">
             <TabsTrigger value="batting">Batting</TabsTrigger>
             <TabsTrigger value="bowling">Bowling</TabsTrigger>
+            <TabsTrigger value="form">
+              <Activity className="h-4 w-4 mr-1" />
+              Form
+            </TabsTrigger>
             <TabsTrigger value="achievements">
               <Award className="h-4 w-4 mr-1" />
               Achievements
@@ -380,6 +386,12 @@ const PlayerProfile: React.FC = () => {
                   No bowling records yet
                 </CardContent>
               </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="form">
+            {playerId && player && (
+              <PlayerFormTracker playerId={playerId} playerName={player.full_name} />
             )}
           </TabsContent>
 
