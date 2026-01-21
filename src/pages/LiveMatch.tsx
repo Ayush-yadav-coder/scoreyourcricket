@@ -25,6 +25,11 @@ import EmbedCodeGenerator from '@/components/embed/EmbedCodeGenerator';
 import EnhancedRunRateGraph from '@/components/match/EnhancedRunRateGraph';
 import MatchMVP from '@/components/match/MatchMVP';
 import MatchPrediction from '@/components/match/MatchPrediction';
+import RealTimeWinProbability from '@/components/match/RealTimeWinProbability';
+import MatchSimulator from '@/components/match/MatchSimulator';
+import PressureIndex from '@/components/match/PressureIndex';
+import PowerplayTracker from '@/components/match/PowerplayTracker';
+import DeathOversAnalysis from '@/components/match/DeathOversAnalysis';
 
 interface Delivery {
   id: string;
@@ -1211,20 +1216,72 @@ const LiveMatch = () => {
               </CardContent>
             </Card>
 
-            {/* Win Prediction */}
+            {/* Real-Time Win Probability */}
+            {currentInnings && match && teams.team1 && teams.team2 && (
+              <RealTimeWinProbability
+                team1Name={teams.team1.name}
+                team2Name={teams.team2.name}
+                team1Id={teams.team1.id}
+                team2Id={teams.team2.id}
+                currentBattingTeamId={currentInnings.batting_team_id}
+                targetScore={currentInnings.innings_number > 1 ? (allInnings[0]?.total_runs || 0) + 1 : null}
+                currentScore={currentInnings.total_runs}
+                currentWickets={currentInnings.total_wickets}
+                currentOvers={currentInnings.total_overs}
+                totalOvers={match.overs || 20}
+                deliveries={allDeliveries
+                  .filter(d => d.innings_id === currentInnings.id)
+                  .map(d => ({
+                    id: d.id,
+                    over_number: d.over_number,
+                    ball_number: d.ball_number,
+                    runs: d.runs,
+                    is_wicket: d.is_wicket,
+                    is_boundary: d.is_boundary,
+                    is_six: d.is_six,
+                  }))}
+                isLive={match.status === 'live'}
+              />
+            )}
+
+            {/* Match Simulator */}
             {currentInnings && match && (
-              <MatchPrediction
+              <MatchSimulator
                 team1Name={teams.team1?.name || 'Team 1'}
                 team2Name={teams.team2?.name || 'Team 2'}
                 team1Score={allInnings.find(i => i.batting_team_id === match.team1_id)?.total_runs || 0}
-                team1Wickets={allInnings.find(i => i.batting_team_id === match.team1_id)?.total_wickets || 0}
-                team1Overs={Number(allInnings.find(i => i.batting_team_id === match.team1_id)?.total_overs || 0)}
                 team2Score={allInnings.find(i => i.batting_team_id === match.team2_id)?.total_runs || 0}
+                team1Wickets={allInnings.find(i => i.batting_team_id === match.team1_id)?.total_wickets || 0}
                 team2Wickets={allInnings.find(i => i.batting_team_id === match.team2_id)?.total_wickets || 0}
+                team1Overs={Number(allInnings.find(i => i.batting_team_id === match.team1_id)?.total_overs || 0)}
                 team2Overs={Number(allInnings.find(i => i.batting_team_id === match.team2_id)?.total_overs || 0)}
                 totalOvers={match.overs || 20}
-                isFirstInnings={currentInnings.innings_number === 1}
+                isSecondInnings={currentInnings.innings_number > 1}
                 target={currentInnings.innings_number > 1 ? (allInnings[0]?.total_runs || 0) + 1 : undefined}
+              />
+            )}
+
+            {/* Pressure Index */}
+            {currentInnings && match && (
+              <PressureIndex
+                deliveries={allDeliveries
+                  .filter(d => d.innings_id === currentInnings.id)
+                  .map(d => ({
+                    over_number: d.over_number,
+                    ball_number: d.ball_number,
+                    runs: d.runs,
+                    is_wicket: d.is_wicket,
+                    is_boundary: d.is_boundary,
+                    is_six: d.is_six,
+                  }))}
+                currentScore={currentInnings.total_runs}
+                currentWickets={currentInnings.total_wickets}
+                currentOvers={currentInnings.total_overs}
+                totalOvers={match.overs || 20}
+                targetScore={currentInnings.innings_number > 1 ? (allInnings[0]?.total_runs || 0) + 1 : undefined}
+                battingTeamName={getBattingTeamName()}
+                bowlingTeamName={currentInnings.batting_team_id === teams.team1?.id ? teams.team2?.name || 'Team 2' : teams.team1?.name || 'Team 1'}
+                isLive={match.status === 'live'}
               />
             )}
 
