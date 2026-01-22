@@ -31,6 +31,7 @@ import PressureIndex from '@/components/match/PressureIndex';
 import PowerplayTracker from '@/components/match/PowerplayTracker';
 import DeathOversAnalysis from '@/components/match/DeathOversAnalysis';
 import BowlingSpellsAnalyzer from '@/components/match/BowlingSpellsAnalyzer';
+import KeyMomentsTimeline from '@/components/match/KeyMomentsTimeline';
 
 interface Delivery {
   id: string;
@@ -984,6 +985,14 @@ const LiveMatch = () => {
 
             {currentInnings && (
               <>
+                {/* Key Moments Timeline (shareable links) */}
+                <KeyMomentsTimeline
+                  matchId={matchId!}
+                  deliveries={currentInningsDeliveries}
+                  teamName={getBattingTeamName()}
+                  powerplayOvers={6}
+                />
+
                 {/* Enhanced Run Rate Graph */}
                 <EnhancedRunRateGraph
                   deliveries={allDeliveries

@@ -19,6 +19,7 @@ interface NotificationPreferences {
   boundaries: boolean;
   sixes: boolean;
   milestones: boolean;
+  smartAlerts: boolean;
   matchStart: boolean;
   matchEnd: boolean;
   messages: boolean;
@@ -31,6 +32,7 @@ const defaultPreferences: NotificationPreferences = {
   boundaries: true,
   sixes: true,
   milestones: true,
+  smartAlerts: true,
   matchStart: true,
   matchEnd: true,
   messages: true,
@@ -227,8 +229,8 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
             showNotification('🏏 FOUR!', 'Shot to the boundary!', 'success');
           }
 
-          // Smart match alerts (kept under the existing "milestones" preference to avoid extra settings work)
-          if (prefs.milestones) {
+          // Smart match alerts (independent toggle)
+          if (prefs.smartAlerts) {
             if (shouldNotifyPowerplayEnd(delivery, 6, powerplayNotifiedRef.current)) {
               showNotification('⚡ Powerplay Completed', 'End of 6 overs — phase summary is ready.', 'info');
             }

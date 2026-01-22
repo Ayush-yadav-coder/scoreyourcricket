@@ -22,7 +22,8 @@ import {
   Volume2,
   VolumeX,
   Smartphone,
-  Monitor
+  Monitor,
+  TrendingUp
 } from 'lucide-react';
 
 interface NotificationPreferences {
@@ -30,6 +31,7 @@ interface NotificationPreferences {
   boundaries: boolean;
   sixes: boolean;
   milestones: boolean;
+  smartAlerts: boolean;
   matchStart: boolean;
   matchEnd: boolean;
   messages: boolean;
@@ -42,6 +44,7 @@ const defaultPreferences: NotificationPreferences = {
   boundaries: true,
   sixes: true,
   milestones: true,
+  smartAlerts: true,
   matchStart: true,
   matchEnd: true,
   messages: true,
@@ -90,6 +93,7 @@ const NotificationSettings: React.FC = () => {
       boundaries: false,
       sixes: false,
       milestones: false,
+      smartAlerts: false,
       matchStart: false,
       matchEnd: false,
       messages: false,
@@ -214,6 +218,16 @@ const NotificationSettings: React.FC = () => {
               description="When team reaches 50, 100, 150, etc."
               checked={preferences.milestones}
               onCheckedChange={(value) => updatePreference('milestones', value)}
+            />
+
+            <Separator />
+
+            <NotificationToggle
+              icon={TrendingUp}
+              label="Smart Alerts"
+              description="Powerplay end + pressure moments (dot-ball streaks)"
+              checked={preferences.smartAlerts}
+              onCheckedChange={(value) => updatePreference('smartAlerts', value)}
             />
             
             <Separator />
