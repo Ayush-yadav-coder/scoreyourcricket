@@ -2,6 +2,12 @@ import React, { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  shouldNotifyPowerplayEnd,
+  shouldNotifyPressure,
+  updateDotStreak,
+  type SmartDelivery,
+} from '@/lib/smartMatchAlerts';
 
 interface MatchNotificationsProps {
   matchId?: string;
@@ -36,7 +42,7 @@ const getPreferences = (): NotificationPreferences => {
   try {
     const saved = localStorage.getItem('notificationPreferences');
     if (saved) {
-      return JSON.parse(saved);
+      return { ...defaultPreferences, ...JSON.parse(saved) };
     }
   } catch (e) {
     console.error('Failed to parse notification preferences:', e);
@@ -47,6 +53,9 @@ const getPreferences = (): NotificationPreferences => {
 const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enabled = true }) => {
   const { user } = useAuth();
   const lastNotifiedRef = useRef<Map<string, number>>(new Map());
+  const powerplayNotifiedRef = useRef<Set<string>>(new Set());
+  const dotStreakRef = useRef<Map<string, number>>(new Map());
+  const allowedInningsIdsRef = useRef<Set<string> | null>(null);
 
   const showNotification = useCallback((title: string, description: string, type: 'success' | 'error' | 'info') => {
     const prefs = getPreferences();
@@ -105,6 +114,23 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
 
     // Subscribe to all live matches if no specific matchId
     const filter = matchId ? `id=eq.${matchId}` : `status=eq.live`;
+
+    // When scoped to a match, pre-fetch innings ids so we can ignore deliveries for other matches.
+    if (matchId) {
+      (async () => {
+        const { data, error } = await supabase
+          .from('innings')
+          .select('id')
+          .eq('match_id', matchId);
+        if (error) {
+          console.error('Failed to load innings ids for notifications:', error);
+          return;
+        }
+        allowedInningsIdsRef.current = new Set((data || []).map(i => (i as any).id));
+      })();
+    } else {
+      allowedInningsIdsRef.current = null;
+    }
 
     // Subscribe to match status changes
     const matchChannel = supabase
@@ -187,7 +213,11 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
         { event: 'INSERT', schema: 'public', table: 'deliveries' },
         (payload) => {
           const prefs = getPreferences();
-          const delivery = payload.new as any;
+          const delivery = payload.new as SmartDelivery;
+
+          // If we're scoped to a specific match, ignore deliveries from other matches.
+          const allowed = allowedInningsIdsRef.current;
+          if (allowed && delivery.innings_id && !allowed.has(delivery.innings_id)) return;
           
           if (delivery.is_wicket && prefs.wickets) {
             showNotification('🏏 WICKET!', `${delivery.dismissal_type || 'Out'}!`, 'error');
@@ -195,6 +225,18 @@ const MatchNotifications: React.FC<MatchNotificationsProps> = ({ matchId, enable
             showNotification('💥 SIX!', 'Maximum! Ball sails over the boundary!', 'success');
           } else if (delivery.is_boundary && prefs.boundaries) {
             showNotification('🏏 FOUR!', 'Shot to the boundary!', 'success');
+          }
+
+          // Smart match alerts (kept under the existing "milestones" preference to avoid extra settings work)
+          if (prefs.milestones) {
+            if (shouldNotifyPowerplayEnd(delivery, 6, powerplayNotifiedRef.current)) {
+              showNotification('⚡ Powerplay Completed', 'End of 6 overs — phase summary is ready.', 'info');
+            }
+
+            const streak = updateDotStreak(dotStreakRef.current, delivery);
+            if (shouldNotifyPressure(streak)) {
+              showNotification('📈 Pressure Building', `${streak} dot balls in a row!`, 'info');
+            }
           }
         }
       )

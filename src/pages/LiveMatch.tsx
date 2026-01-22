@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +30,7 @@ import MatchSimulator from '@/components/match/MatchSimulator';
 import PressureIndex from '@/components/match/PressureIndex';
 import PowerplayTracker from '@/components/match/PowerplayTracker';
 import DeathOversAnalysis from '@/components/match/DeathOversAnalysis';
+import BowlingSpellsAnalyzer from '@/components/match/BowlingSpellsAnalyzer';
 
 interface Delivery {
   id: string;
@@ -776,6 +777,89 @@ const LiveMatch = () => {
   const battingScorecard = getBattingScorecard();
   const bowlingScorecard = getBowlingScorecard();
 
+  const playerNames = useMemo(() => {
+    const out: Record<string, string> = {};
+    profiles.forEach((p, id) => {
+      out[id] = p.full_name;
+    });
+    return out;
+  }, [profiles]);
+
+  const team1InningsIds = useMemo(
+    () => allInnings.filter(i => i.batting_team_id === teams.team1?.id).map(i => i.id),
+    [allInnings, teams.team1?.id]
+  );
+
+  const team2InningsIds = useMemo(
+    () => allInnings.filter(i => i.batting_team_id === teams.team2?.id).map(i => i.id),
+    [allInnings, teams.team2?.id]
+  );
+
+  const team1Deliveries = useMemo(
+    () =>
+      allDeliveries
+        .filter(d => team1InningsIds.includes(d.innings_id))
+        .map(d => ({
+          over_number: d.over_number,
+          ball_number: d.ball_number,
+          runs: d.runs,
+          is_wicket: d.is_wicket,
+          is_boundary: d.is_boundary,
+          is_six: d.is_six,
+          is_wide: d.is_wide,
+          is_no_ball: d.is_no_ball,
+        })),
+    [allDeliveries, team1InningsIds]
+  );
+
+  const team2Deliveries = useMemo(
+    () =>
+      allDeliveries
+        .filter(d => team2InningsIds.includes(d.innings_id))
+        .map(d => ({
+          over_number: d.over_number,
+          ball_number: d.ball_number,
+          runs: d.runs,
+          is_wicket: d.is_wicket,
+          is_boundary: d.is_boundary,
+          is_six: d.is_six,
+          is_wide: d.is_wide,
+          is_no_ball: d.is_no_ball,
+        })),
+    [allDeliveries, team2InningsIds]
+  );
+
+  const currentInningsDeliveries = useMemo(
+    () =>
+      currentInnings
+        ? allDeliveries
+            .filter(d => d.innings_id === currentInnings.id)
+            .map(d => ({
+              bowler_id: d.bowler_id,
+              over_number: d.over_number,
+              ball_number: d.ball_number,
+              runs: d.runs,
+              is_wicket: d.is_wicket,
+              is_wide: d.is_wide,
+              is_no_ball: d.is_no_ball,
+            }))
+        : [],
+    [allDeliveries, currentInnings]
+  );
+
+  const currentInningsBowlers = useMemo(() => {
+    if (!currentInnings) return [];
+    const ids = new Set<string>();
+    allDeliveries
+      .filter(d => d.innings_id === currentInnings.id)
+      .forEach(d => ids.add(d.bowler_id));
+
+    return Array.from(ids).map(id => ({
+      id,
+      name: profiles.get(id)?.full_name || 'Unknown',
+    }));
+  }, [allDeliveries, currentInnings, profiles]);
+
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-8 space-y-6">
@@ -992,6 +1076,37 @@ const LiveMatch = () => {
                     />
                   </div>
                 </div>
+
+                {/* Phase-wise Analysis */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <PowerplayTracker
+                    team1Deliveries={team1Deliveries}
+                    team2Deliveries={team2Deliveries}
+                    team1Name={teams.team1?.name || 'Team 1'}
+                    team2Name={teams.team2?.name || 'Team 2'}
+                    powerplayOvers={6}
+                  />
+
+                  <DeathOversAnalysis
+                    deliveries={allDeliveries
+                      .filter(d => d.innings_id === currentInnings.id)
+                      .map(d => ({
+                        over_number: d.over_number,
+                        ball_number: d.ball_number,
+                        runs: d.runs,
+                        is_wicket: d.is_wicket,
+                        is_boundary: d.is_boundary,
+                        is_six: d.is_six,
+                        is_wide: d.is_wide,
+                        is_no_ball: d.is_no_ball,
+                        batsman_id: d.batsman_id,
+                        bowler_id: d.bowler_id,
+                      }))}
+                    totalOvers={match.overs || 20}
+                    teamName={getBattingTeamName()}
+                    playerNames={playerNames}
+                  />
+                </div>
               </>
             )}
 
@@ -1122,6 +1237,14 @@ const LiveMatch = () => {
 
             {/* Over-by-over Graph */}
             <OverByOverGraph overData={overByOverData} teamName={getBattingTeamName()} />
+
+            {/* Bowling Spells Analyzer */}
+            {currentInnings && (
+              <BowlingSpellsAnalyzer
+                deliveries={currentInningsDeliveries}
+                bowlers={currentInningsBowlers}
+              />
+            )}
 
             {/* Wagon Wheel */}
             <Card className="bg-card border-border">
